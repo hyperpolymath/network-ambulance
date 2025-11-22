@@ -1,0 +1,28 @@
+# security.txt - RFC 9116 Compliant Security Contact Information
+# https://securitytxt.org/
+
+Contact: mailto:security@example.com
+Contact: https://github.com/Hyperpolymath/complete-linux-internet-repair/security/advisories/new
+Expires: 2026-01-22T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://github.com/Hyperpolymath/complete-linux-internet-repair/blob/main/.well-known/security.txt
+
+# Policy
+Policy: https://github.com/Hyperpolymath/complete-linux-internet-repair/blob/main/SECURITY.md
+
+# Acknowledgments
+Acknowledgments: https://github.com/Hyperpolymath/complete-linux-internet-repair/blob/main/SECURITY.md#hall-of-fame
+
+# Encryption
+# Encryption: https://keys.openpgp.org/search?q=security@example.com
+# (Add PGP key URL when available)
+
+# Hiring
+# We are an open source project and do not have security positions
+
+# Additional Information
+# This tool requires root privileges by design for network configuration
+# Please review SECURITY.md for security considerations before reporting
+# We use GitHub Security Advisories for coordinated disclosure
+# Response timeline: 48h acknowledgment, 5 day initial assessment
+# CVSS v3.1 scoring for severity assessment

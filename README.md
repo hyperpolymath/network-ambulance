@@ -5,6 +5,8 @@ A comprehensive, automated toolkit for diagnosing and repairing internet connect
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Bash](https://img.shields.io/badge/bash-4.0%2B-green.svg)](https://www.gnu.org/software/bash/)
 [![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)](https://www.linux.org/)
+[![RSR Compliance](https://img.shields.io/badge/RSR-Silver-silver.svg)](RSR-COMPLIANCE.md)
+[![TPCF](https://img.shields.io/badge/TPCF-Perimeter%203-blue.svg)](TPCF.md)
 
 ## Features
 
@@ -41,6 +43,22 @@ A comprehensive, automated toolkit for diagnosing and repairing internet connect
   - Fedora (38, 39, 40)
   - Arch Linux
   - And more...
+
+## Standards Compliance
+
+This project follows the **RSR (Rhodium Standard Repository) Framework** at **Silver Level**:
+
+- ✅ Complete documentation (README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, MAINTAINERS)
+- ✅ TPCF (Tri-Perimeter Contribution Framework) for graduated trust
+- ✅ .well-known directory (security.txt RFC 9116, ai.txt, humans.txt)
+- ✅ CI/CD with automated testing
+- ✅ Comprehensive test suite
+- ✅ Build automation (justfile)
+- ✅ Security-first design with backups and dry-run
+- ✅ Accessibility features (color detection, screen reader compatible)
+- ✅ i18n/l10n ready (planning for v1.2+)
+
+See [RSR-COMPLIANCE.md](RSR-COMPLIANCE.md) for full compliance details.
 
 ## Quick Start
 

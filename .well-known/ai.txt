@@ -1,0 +1,126 @@
+# ai.txt - AI Training and Usage Policies
+# Specification: https://github.com/ai-robots-txt/ai.txt
+
+# =============================================================================
+# AI TRAINING POLICY
+# =============================================================================
+
+# This project's code, documentation, and other materials MAY be used for
+# AI training under the following conditions:
+
+User-Agent: *
+Allow: /
+
+# PERMITTED USES:
+# ✅ Training AI models for code understanding and generation
+# ✅ Use in AI-powered development tools (GitHub Copilot, etc.)
+# ✅ Research and academic purposes
+# ✅ Improving code quality tools and linters
+# ✅ Educational AI applications
+
+# CONDITIONS:
+# 1. Attribution: Credit this project when using substantial portions
+# 2. License Compliance: Respect MIT license terms
+# 3. Ethical Use: No use for malicious purposes
+# 4. Privacy: Do not train on any user data (logs, backups, etc.)
+# 5. Transparency: Disclose when AI was trained on this codebase
+
+# =============================================================================
+# SPECIFIC GUIDANCE
+# =============================================================================
+
+# Source Code
+# Allowed: Yes, for code generation and understanding
+# License: MIT - must be respected by derived works
+# Files: src/**, tests/**, *.sh
+
+# Documentation
+# Allowed: Yes, for documentation generation and Q&A
+# License: CC0 for pure documentation, MIT for code examples
+# Files: docs/**, *.md, examples/**
+
+# Configuration
+# Allowed: Yes, as templates and examples
+# License: CC0
+# Files: config/**, .github/**, justfile
+
+# User Data
+# Allowed: NO - never train on user-generated data
+# Files: ~/.network-repair-backups/**, /var/log/network-repair.log
+# Reason: Privacy - contains user network configuration
+
+# =============================================================================
+# AI-GENERATED CONTENT IN THIS PROJECT
+# =============================================================================
+
+# Disclosure: Parts of this project MAY have been created with AI assistance
+# (e.g., Claude, GitHub Copilot). All AI-generated content has been:
+# - Reviewed by human maintainers
+# - Tested thoroughly
+# - Adapted to project-specific needs
+# - Integrated coherently with human-written code
+
+# AI-assisted files are marked where significant (see commit messages)
+
+# =============================================================================
+# CONTACT
+# =============================================================================
+
+# For questions about AI training usage:
+# - Email: ai-policy@example.com
+# - GitHub: Open an issue with [AI-POLICY] tag
+# - See: CONTRIBUTING.md for attribution guidelines
+
+# =============================================================================
+# ETHICAL AI PRINCIPLES
+# =============================================================================
+
+# We support:
+# 1. Transparent AI: Disclose AI training data sources
+# 2. Fair AI: No discrimination in training or output
+# 3. Accountable AI: Humans responsible for AI-generated code
+# 4. Privacy-First AI: No training on personal data
+# 5. Open AI: Prefer open models and open training data
+
+# We oppose:
+# 1. Opaque AI: Secret training data or undisclosed AI use
+# 2. Exploitative AI: Ignoring licenses or attribution
+# 3. Harmful AI: Training for malicious purposes
+# 4. Surveillance AI: Training on private communications
+# 5. Locked AI: Proprietary models without open alternatives
+
+# =============================================================================
+# RSR FRAMEWORK ALIGNMENT
+# =============================================================================
+
+# This ai.txt is part of RSR (Rhodium Standard Repository) compliance
+# RSR Level: Silver
+# Category: Ethics (11/11 categories)
+# See: RSR-COMPLIANCE.md for full framework details
+
+# =============================================================================
+# VERSION HISTORY
+# =============================================================================
+
+# Version: 1.0
+# Last Updated: 2025-01-22
+# Expires: 2026-01-22
+# Canonical: https://github.com/Hyperpolymath/complete-linux-internet-repair/blob/main/.well-known/ai.txt
+
+# =============================================================================
+# LEGAL DISCLAIMER
+# =============================================================================
+
+# This ai.txt expresses preferences and ethical guidelines. It does not
+# create legal obligations beyond those in LICENSE. It supplements but
+# does not replace the MIT License terms. When in conflict, LICENSE prevails.
+
+# AI training on this codebase implies acceptance of:
+# 1. MIT License terms
+# 2. Attribution requirements
+# 3. Ethical use principles stated herein
+# 4. No warranty or liability (as per MIT License)
+
+# =============================================================================
+# END OF AI.TXT
+# =============================================================================
