@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Get version from tag
         id: get_version
@@ -33,7 +33,7 @@ jobs:
           sha256sum network-repair-${{ steps.get_version.outputs.VERSION }}.tar.gz > checksums.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             release/network-repair-${{ steps.get_version.outputs.VERSION }}.tar.gz
