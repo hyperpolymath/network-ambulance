@@ -1,0 +1,361 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+= Complete Linux Internet Repair - Roadmap
+:author: Hyperpolymath
+:toc: macro
+:toclevels: 2
+:icons: font
+
+Development roadmap and future enhancements for Complete Linux Internet Repair.
+
+toc::[]
+
+== Current State (v1.0.0)
+
+=== Implemented Features
+
+==== Diagnostic Modules
+
+[cols="1,1,3"]
+|===
+|Module |Status |Capabilities
+
+|*DNS Diagnostics*
+|Complete
+|resolv.conf validation, systemd-resolved status, DNS server testing, resolution verification, cache statistics
+
+|*Interface Diagnostics*
+|Complete
+|Interface enumeration, status checking, IP/MAC display, link state, driver info, statistics, conflict detection
+
+|*Routing Diagnostics*
+|Complete
+|Default route validation, gateway reachability, IPv6 routing, policy rules, metric analysis, ARP table
+
+|*Connectivity Diagnostics*
+|Complete
+|Ping tests (IP & DNS), HTTP/HTTPS verification, port connectivity, MTU discovery, latency measurement
+
+|*Firewall Diagnostics*
+|Complete
+|iptables rules, nftables rules, UFW status, firewalld zones, policy analysis
+
+|*NetworkManager Diagnostics*
+|Complete
+|Service status, connections, devices, connectivity state, configuration, conflict detection
+|===
+
+==== Repair Modules
+
+[cols="1,1,3"]
+|===
+|Module |Status |Capabilities
+
+|*DNS Repairs*
+|Complete
+|Create/fix resolv.conf, add DNS servers, reset to defaults, restart systemd-resolved, flush cache, configure NM DNS
+
+|*Interface Repairs*
+|Complete
+|Bring up interfaces, restart interfaces, renew DHCP, reset to DHCP, repair down interfaces
+
+|*Routing Repairs*
+|Complete
+|Add default route, remove duplicates, repair gateway, flush & rebuild routing table
+
+|*NetworkManager Repairs*
+|Complete
+|Restart service, reconnect connections, enable interface management, resolve conflicts, reset connections
+|===
+
+==== Utilities
+
+[cols="1,1,3"]
+|===
+|Utility |Status |Capabilities
+
+|*Logging*
+|Complete
+|Multi-level (DEBUG-FATAL), file output, colored console, section headers
+
+|*Colors*
+|Complete
+|Auto-detection, force enable/disable, full color palette
+
+|*Privileges*
+|Complete
+|Root detection, sudo management, privilege elevation, session keepalive
+
+|*Backup*
+|Complete
+|Timestamped backups, restore functionality, retention policies, backup listing
+
+|*System Detection*
+|Complete
+|Distribution detection, family grouping, network manager detection, interface utilities
+|===
+
+==== Core Features
+
+[cols="1,1"]
+|===
+|Feature |Status
+
+|CLI with 12+ commands
+|Complete
+
+|Interactive guided mode
+|Complete
+
+|Dry-run mode
+|Complete
+
+|Auto-repair mode
+|Complete
+
+|Verbose/quiet modes
+|Complete
+
+|File logging
+|Complete
+
+|Multi-distribution support
+|Complete
+
+|Installation script
+|Complete
+
+|Uninstallation script
+|Complete
+
+|Test suite
+|Complete
+|===
+
+== Phase 2: Enhanced Diagnostics
+
+=== Wireless-Specific Diagnostics
+
+* Signal strength analysis and recommendations
+* Channel interference detection
+* WiFi authentication troubleshooting
+* WPA supplicant diagnostics
+* Hidden network detection
+
+=== VPN Diagnostics
+
+* OpenVPN connection status
+* WireGuard tunnel verification
+* IPSec/IKEv2 diagnostics
+* VPN routing table analysis
+* Split-tunnel verification
+
+=== Proxy & Captive Portal
+
+* HTTP/SOCKS proxy detection
+* Captive portal identification
+* Proxy authentication testing
+* PAC file validation
+
+=== Hardware Diagnostics
+
+* Network card driver status
+* Firmware version checking
+* Hardware error detection
+* PCI/USB device enumeration
+* ethtool statistics integration
+
+== Phase 3: Advanced Repairs
+
+=== Wireless Repairs
+
+* WiFi reconnection procedures
+* WPA supplicant restart
+* Network rescan trigger
+* Power management fixes
+
+=== Firewall Repairs
+
+* UFW rule management
+* firewalld zone configuration
+* iptables rule insertion
+* Common port opening
+
+=== systemd-networkd Support
+
+* Full systemd-networkd repairs
+* .network file management
+* Link configuration
+* Network namespace handling
+
+=== netplan Support
+
+* Netplan configuration parsing
+* Netplan apply procedures
+* Renderer switching (NM/networkd)
+
+== Phase 4: Enterprise Features
+
+=== Plugin Architecture
+
+* Dynamic module loading
+* Third-party plugin support
+* Plugin discovery mechanism
+* Sandboxed execution
+
+=== Configuration Management
+
+* Per-distribution config profiles
+* User preference storage
+* Config import/export
+* Central policy management
+
+=== Remote Execution
+
+* SSH-based remote diagnostics
+* Agent-based deployment
+* Batch server diagnostics
+* Result aggregation
+
+=== API & Integration
+
+* JSON output format for all operations
+* REST API server mode
+* Prometheus metrics endpoint
+* SNMP trap integration
+
+== Phase 5: User Experience
+
+=== Web Interface
+
+* Browser-based dashboard
+* Real-time diagnostic display
+* One-click repairs
+* Mobile-responsive design
+
+=== TUI (Terminal UI)
+
+* ncurses-based interface
+* Real-time updates
+* Mouse support
+* Keyboard navigation
+
+=== Internationalization
+
+* Multi-language support
+* Locale-aware formatting
+* RTL language support
+* Translation framework
+
+=== Accessibility
+
+* Screen reader compatibility
+* High-contrast mode
+* Keyboard-only navigation
+* Reduced motion support
+
+== Phase 6: Data & Analytics
+
+=== Diagnostic History
+
+* SQLite database for history
+* Trend analysis
+* Issue recurrence detection
+* Time-based reporting
+
+=== Reporting
+
+* PDF report generation
+* HTML diagnostic reports
+* Email report delivery
+* Scheduled diagnostics
+
+=== Machine Learning
+
+* Pattern recognition for issues
+* Predictive failure detection
+* Automated repair suggestions
+* Self-improving diagnostics
+
+== Phase 7: Ecosystem
+
+=== Package Distribution
+
+* Debian/Ubuntu .deb packages
+* Fedora/RHEL .rpm packages
+* Arch AUR package
+* Flatpak/Snap packages
+* AppImage portable binary
+
+=== Container Support
+
+* Docker diagnostics
+* Kubernetes network debugging
+* Container network namespace handling
+* CNI plugin diagnostics
+
+=== Cloud Integration
+
+* AWS VPC diagnostics
+* GCP network diagnostics
+* Azure networking checks
+* Cloud metadata detection
+
+== Technical Debt & Improvements
+
+=== Code Quality
+
+* [ ] Complete ShellCheck compliance
+* [ ] Unit test coverage >80%
+* [ ] Integration test suite
+* [ ] Documentation generation
+
+=== Performance
+
+* [ ] Parallel diagnostic execution
+* [ ] Cached system detection
+* [ ] Lazy module loading
+* [ ] Reduced subprocess spawning
+
+=== Security
+
+* [ ] Security audit
+* [ ] Signed releases
+* [ ] CVE monitoring
+* [ ] Privilege minimization review
+
+== Version Planning
+
+=== v1.1.0
+
+* Wireless diagnostics improvements
+* VPN detection basics
+* Bug fixes from v1.0 feedback
+
+=== v1.2.0
+
+* Firewall repair module
+* systemd-networkd improvements
+* Extended test coverage
+
+=== v2.0.0
+
+* Plugin architecture
+* JSON API output
+* Breaking changes for clean design
+
+=== v3.0.0
+
+* Web interface
+* Remote execution
+* Enterprise features
+
+== Contributing
+
+See link:CONTRIBUTING.md[CONTRIBUTING.md] for how to contribute to roadmap items.
+
+Priority is given to:
+
+1. Bug fixes and stability improvements
+2. Multi-distribution compatibility
+3. User-requested features
+4. Documentation improvements
