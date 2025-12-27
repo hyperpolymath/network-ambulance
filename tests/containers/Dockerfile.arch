@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+# Dockerfile for Arch Linux testing
+FROM archlinux:latest
+
+LABEL maintainer="Complete Linux Internet Repair"
+LABEL description="Test container for Arch Linux"
+
+# Update and install required packages
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm \
+    bash \
+    iproute2 \
+    iputils \
+    bind \
+    curl \
+    sudo \
+    procps-ng \
+    net-tools \
+    ca-certificates \
+    && pacman -Scc --noconfirm
+
+# Create test user
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Copy project files
+COPY . /opt/network-repair
+WORKDIR /opt/network-repair
+
+# Make scripts executable
+RUN chmod +x network-repair src/main.sh install.sh && \
+    find src -name "*.sh" -exec chmod +x {} \; && \
+    find tests -name "*.sh" -exec chmod +x {} \;
+
+# Set entrypoint
+ENTRYPOINT ["/opt/network-repair/network-repair"]
+CMD ["--help"]

@@ -1,0 +1,122 @@
+{
+  "description": "Linux distribution test matrix for Complete Linux Internet Repair",
+  "distros": {
+    "debian-family": [
+      {
+        "name": "ubuntu-20.04",
+        "image": "ubuntu:20.04",
+        "package_manager": "apt",
+        "network_manager": "NetworkManager",
+        "init": "systemd"
+      },
+      {
+        "name": "ubuntu-22.04",
+        "image": "ubuntu:22.04",
+        "package_manager": "apt",
+        "network_manager": "NetworkManager",
+        "init": "systemd"
+      },
+      {
+        "name": "ubuntu-24.04",
+        "image": "ubuntu:24.04",
+        "package_manager": "apt",
+        "network_manager": "NetworkManager",
+        "init": "systemd"
+      },
+      {
+        "name": "debian-11",
+        "image": "debian:11",
+        "package_manager": "apt",
+        "network_manager": "ifupdown",
+        "init": "systemd"
+      },
+      {
+        "name": "debian-12",
+        "image": "debian:12",
+        "package_manager": "apt",
+        "network_manager": "ifupdown",
+        "init": "systemd"
+      }
+    ],
+    "rhel-family": [
+      {
+        "name": "fedora-39",
+        "image": "fedora:39",
+        "package_manager": "dnf",
+        "network_manager": "NetworkManager",
+        "init": "systemd"
+      },
+      {
+        "name": "fedora-40",
+        "image": "fedora:40",
+        "package_manager": "dnf",
+        "network_manager": "NetworkManager",
+        "init": "systemd"
+      },
+      {
+        "name": "rockylinux-9",
+        "image": "rockylinux:9",
+        "package_manager": "dnf",
+        "network_manager": "NetworkManager",
+        "init": "systemd"
+      },
+      {
+        "name": "almalinux-9",
+        "image": "almalinux:9",
+        "package_manager": "dnf",
+        "network_manager": "NetworkManager",
+        "init": "systemd"
+      }
+    ],
+    "arch-family": [
+      {
+        "name": "archlinux",
+        "image": "archlinux:latest",
+        "package_manager": "pacman",
+        "network_manager": "systemd-networkd",
+        "init": "systemd"
+      }
+    ],
+    "alpine": [
+      {
+        "name": "alpine-3.19",
+        "image": "alpine:3.19",
+        "package_manager": "apk",
+        "network_manager": "ifupdown",
+        "init": "openrc",
+        "notes": "Uses busybox, some commands may differ"
+      },
+      {
+        "name": "alpine-3.20",
+        "image": "alpine:3.20",
+        "package_manager": "apk",
+        "network_manager": "ifupdown",
+        "init": "openrc",
+        "notes": "Uses busybox, some commands may differ"
+      }
+    ],
+    "suse-family": [
+      {
+        "name": "opensuse-leap-15.5",
+        "image": "opensuse/leap:15.5",
+        "package_manager": "zypper",
+        "network_manager": "wicked",
+        "init": "systemd"
+      },
+      {
+        "name": "opensuse-tumbleweed",
+        "image": "opensuse/tumbleweed:latest",
+        "package_manager": "zypper",
+        "network_manager": "NetworkManager",
+        "init": "systemd"
+      }
+    ]
+  },
+  "test_packages": {
+    "apt": ["iproute2", "iputils-ping", "dnsutils", "curl", "sudo", "procps"],
+    "dnf": ["iproute", "iputils", "bind-utils", "curl", "sudo", "procps-ng"],
+    "pacman": ["iproute2", "iputils", "bind", "curl", "sudo", "procps-ng"],
+    "apk": ["iproute2", "iputils", "bind-tools", "curl", "sudo", "procps"],
+    "zypper": ["iproute2", "iputils", "bind-utils", "curl", "sudo", "procps"]
+  }
+}

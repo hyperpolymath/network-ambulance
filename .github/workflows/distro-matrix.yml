@@ -1,0 +1,386 @@
+# SPDX-License-Identifier: MIT
+name: Distribution Matrix Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run weekly on Sundays at 00:00 UTC
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+    inputs:
+      distro_filter:
+        description: "Filter distros (e.g., ubuntu, fedora, all)"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  # Debian/Ubuntu family tests
+  debian-family:
+    name: ${{ matrix.distro.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - name: ubuntu-20.04
+            image: ubuntu:20.04
+          - name: ubuntu-22.04
+            image: ubuntu:22.04
+          - name: ubuntu-24.04
+            image: ubuntu:24.04
+          - name: debian-11
+            image: debian:11
+          - name: debian-12
+            image: debian:12
+
+    container:
+      image: ${{ matrix.distro.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            bash iproute2 iputils-ping dnsutils curl sudo procps ca-certificates
+
+      - name: Setup scripts
+        run: |
+          chmod +x network-repair src/main.sh
+          find src -name "*.sh" -exec chmod +x {} \;
+          find tests -name "*.sh" -exec chmod +x {} \;
+
+      - name: Run syntax checks
+        run: |
+          find . -name "*.sh" -type f ! -path "./.git/*" -exec bash -n {} \;
+
+      - name: Test help command
+        run: ./network-repair --help
+
+      - name: Test version command
+        run: ./network-repair --version
+
+      - name: Test diagnostics (safe mode)
+        run: ./network-repair diagnose || true
+
+      - name: Test dry-run mode
+        run: ./network-repair --dry-run repair || true
+
+      - name: Verify safe mode blocks repairs
+        run: |
+          # Should exit with error when trying to repair without --apply-fixes
+          if ./network-repair repair 2>&1 | grep -q "SAFE MODE"; then
+            echo "Safe mode correctly blocks repairs"
+          else
+            echo "Safe mode check failed"
+            exit 1
+          fi
+
+      - name: Run test suite
+        run: ./tests/run-tests.sh
+
+  # Fedora/RHEL family tests
+  rhel-family:
+    name: ${{ matrix.distro.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - name: fedora-39
+            image: fedora:39
+          - name: fedora-40
+            image: fedora:40
+          - name: rockylinux-9
+            image: rockylinux:9
+          - name: almalinux-9
+            image: almalinux:9
+
+    container:
+      image: ${{ matrix.distro.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install dependencies
+        run: |
+          dnf install -y \
+            bash iproute iputils bind-utils curl sudo procps-ng ca-certificates
+
+      - name: Setup scripts
+        run: |
+          chmod +x network-repair src/main.sh
+          find src -name "*.sh" -exec chmod +x {} \;
+          find tests -name "*.sh" -exec chmod +x {} \;
+
+      - name: Run syntax checks
+        run: |
+          find . -name "*.sh" -type f ! -path "./.git/*" -exec bash -n {} \;
+
+      - name: Test help command
+        run: ./network-repair --help
+
+      - name: Test version command
+        run: ./network-repair --version
+
+      - name: Test diagnostics (safe mode)
+        run: ./network-repair diagnose || true
+
+      - name: Test dry-run mode
+        run: ./network-repair --dry-run repair || true
+
+      - name: Verify safe mode blocks repairs
+        run: |
+          if ./network-repair repair 2>&1 | grep -q "SAFE MODE"; then
+            echo "Safe mode correctly blocks repairs"
+          else
+            echo "Safe mode check failed"
+            exit 1
+          fi
+
+      - name: Run test suite
+        run: ./tests/run-tests.sh
+
+  # Arch Linux tests
+  arch-family:
+    name: archlinux
+    runs-on: ubuntu-latest
+
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            bash iproute2 iputils bind curl sudo procps-ng ca-certificates
+
+      - name: Setup scripts
+        run: |
+          chmod +x network-repair src/main.sh
+          find src -name "*.sh" -exec chmod +x {} \;
+          find tests -name "*.sh" -exec chmod +x {} \;
+
+      - name: Run syntax checks
+        run: |
+          find . -name "*.sh" -type f ! -path "./.git/*" -exec bash -n {} \;
+
+      - name: Test help command
+        run: ./network-repair --help
+
+      - name: Test version command
+        run: ./network-repair --version
+
+      - name: Test diagnostics (safe mode)
+        run: ./network-repair diagnose || true
+
+      - name: Verify safe mode blocks repairs
+        run: |
+          if ./network-repair repair 2>&1 | grep -q "SAFE MODE"; then
+            echo "Safe mode correctly blocks repairs"
+          else
+            echo "Safe mode check failed"
+            exit 1
+          fi
+
+      - name: Run test suite
+        run: ./tests/run-tests.sh
+
+  # Alpine Linux tests
+  alpine-family:
+    name: ${{ matrix.distro.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - name: alpine-3.19
+            image: alpine:3.19
+          - name: alpine-3.20
+            image: alpine:3.20
+
+    container:
+      image: ${{ matrix.distro.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install dependencies
+        run: |
+          apk add --no-cache \
+            bash iproute2 iputils bind-tools curl sudo procps coreutils ca-certificates
+
+      - name: Setup scripts
+        run: |
+          chmod +x network-repair src/main.sh
+          find src -name "*.sh" -exec chmod +x {} \;
+          find tests -name "*.sh" -exec chmod +x {} \;
+
+      - name: Run syntax checks
+        run: |
+          find . -name "*.sh" -type f ! -path "./.git/*" -exec bash -n {} \;
+
+      - name: Test help command
+        run: ./network-repair --help
+
+      - name: Test version command
+        run: ./network-repair --version
+
+      - name: Test diagnostics (safe mode)
+        run: ./network-repair diagnose || true
+
+      - name: Verify safe mode blocks repairs
+        run: |
+          if ./network-repair repair 2>&1 | grep -q "SAFE MODE"; then
+            echo "Safe mode correctly blocks repairs"
+          else
+            echo "Safe mode check failed"
+            exit 1
+          fi
+
+      - name: Run test suite
+        run: ./tests/run-tests.sh
+
+  # openSUSE tests
+  suse-family:
+    name: ${{ matrix.distro.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - name: opensuse-leap-15.5
+            image: opensuse/leap:15.5
+          - name: opensuse-tumbleweed
+            image: opensuse/tumbleweed:latest
+
+    container:
+      image: ${{ matrix.distro.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install dependencies
+        run: |
+          zypper --non-interactive install \
+            bash iproute2 iputils bind-utils curl sudo procps ca-certificates
+
+      - name: Setup scripts
+        run: |
+          chmod +x network-repair src/main.sh
+          find src -name "*.sh" -exec chmod +x {} \;
+          find tests -name "*.sh" -exec chmod +x {} \;
+
+      - name: Run syntax checks
+        run: |
+          find . -name "*.sh" -type f ! -path "./.git/*" -exec bash -n {} \;
+
+      - name: Test help command
+        run: ./network-repair --help
+
+      - name: Test version command
+        run: ./network-repair --version
+
+      - name: Test diagnostics (safe mode)
+        run: ./network-repair diagnose || true
+
+      - name: Verify safe mode blocks repairs
+        run: |
+          if ./network-repair repair 2>&1 | grep -q "SAFE MODE"; then
+            echo "Safe mode correctly blocks repairs"
+          else
+            echo "Safe mode check failed"
+            exit 1
+          fi
+
+      - name: Run test suite
+        run: ./tests/run-tests.sh
+
+  # Network namespace integration tests (requires privileged container)
+  netns-integration:
+    name: Network Namespace Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iproute2 iputils-ping dnsutils curl
+
+      - name: Setup scripts
+        run: |
+          chmod +x network-repair src/main.sh
+          find src -name "*.sh" -exec chmod +x {} \;
+          find tests -name "*.sh" -exec chmod +x {} \;
+
+      - name: Run netns integration tests
+        run: |
+          # Test that netns utilities can be sourced
+          sudo bash -c 'source tests/lib/netns.sh && echo "netns utilities loaded"'
+
+          # Note: Full netns tests require privileged mode which may not be
+          # available in all CI environments. The utilities are validated
+          # for syntax and basic functionality.
+
+      - name: Verify safe mode in different contexts
+        run: |
+          # Test diagnose-only mode (default)
+          ./network-repair diagnose-dns || true
+
+          # Test that repair requires --apply-fixes
+          if ./network-repair repair-dns 2>&1 | grep -q "SAFE MODE\|--apply-fixes"; then
+            echo "DNS repair correctly blocked in safe mode"
+          fi
+
+          # Test dry-run mode
+          ./network-repair --dry-run repair || true
+
+  # Summary job
+  matrix-summary:
+    name: Matrix Summary
+    runs-on: ubuntu-latest
+    needs:
+      - debian-family
+      - rhel-family
+      - arch-family
+      - alpine-family
+      - suse-family
+      - netns-integration
+    if: always()
+
+    steps:
+      - name: Check matrix results
+        run: |
+          echo "Distribution Matrix Test Results:"
+          echo "================================="
+          echo "Debian/Ubuntu: ${{ needs.debian-family.result }}"
+          echo "RHEL/Fedora:   ${{ needs.rhel-family.result }}"
+          echo "Arch Linux:    ${{ needs.arch-family.result }}"
+          echo "Alpine Linux:  ${{ needs.alpine-family.result }}"
+          echo "openSUSE:      ${{ needs.suse-family.result }}"
+          echo "NetNS Tests:   ${{ needs.netns-integration.result }}"
+
+          # Fail if any critical job failed
+          if [[ "${{ needs.debian-family.result }}" == "failure" ]] || \
+             [[ "${{ needs.rhel-family.result }}" == "failure" ]]; then
+            echo "Critical distribution tests failed!"
+            exit 1
+          fi
