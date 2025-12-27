@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Complete Linux Internet Repair Tool
 # Main entry point
 
@@ -16,6 +17,7 @@ source "${SCRIPT_DIR}/utils/logging.sh"
 source "${SCRIPT_DIR}/utils/privileges.sh"
 source "${SCRIPT_DIR}/utils/system.sh"
 source "${SCRIPT_DIR}/utils/backup.sh"
+source "${SCRIPT_DIR}/utils/safemode.sh"
 
 # Source diagnostics
 source "${SCRIPT_DIR}/diagnostics/dns.sh"
@@ -41,11 +43,14 @@ show_usage() {
     cat << EOF
 Complete Linux Internet Repair Tool v${VERSION}
 
+SAFE BY DEFAULT: This tool runs in read-only diagnostic mode by default.
+Repairs require the --apply-fixes flag to prevent accidental system changes.
+
 Usage: $(basename "$0") [OPTIONS] [COMMAND]
 
 Commands:
-    diagnose          Run all diagnostics (default)
-    repair            Run all repairs (requires root)
+    diagnose          Run all diagnostics (default, always safe)
+    repair            Run all repairs (requires --apply-fixes and root)
     interactive       Run in interactive guided mode
 
     diagnose-dns      Diagnose DNS issues only
@@ -53,40 +58,49 @@ Commands:
     diagnose-routing  Diagnose routing issues only
     diagnose-all      Run all diagnostics
 
-    repair-dns        Repair DNS issues only
-    repair-network    Repair network interfaces only
-    repair-routing    Repair routing issues only
-    repair-all        Run all repairs
+    repair-dns        Repair DNS issues only (requires --apply-fixes)
+    repair-network    Repair network interfaces only (requires --apply-fixes)
+    repair-routing    Repair routing issues only (requires --apply-fixes)
+    repair-nm         Repair NetworkManager only (requires --apply-fixes)
+    repair-all        Run all repairs (requires --apply-fixes)
 
-Options:
+Safety Options:
+    --apply-fixes     REQUIRED to enable any repair operations
+    -d, --dry-run     Preview repairs without making changes
+    --diagnose-only   Explicitly run in diagnostic-only mode (default)
+
+General Options:
     -h, --help        Show this help message
     -v, --version     Show version information
     -V, --verbose     Enable verbose output
     -q, --quiet       Quiet mode (errors only)
-    -i, --interactive Run in interactive mode
-    -a, --auto-repair Automatically repair found issues
-    -d, --dry-run     Show what would be done without doing it
+    -i, --interactive Run in interactive mode (still requires --apply-fixes for repairs)
     --no-color        Disable colored output
     --log-file FILE   Write logs to FILE
 
+Deprecated Options:
+    -a, --auto-repair Deprecated: use --apply-fixes instead
+
 Examples:
-    # Run diagnostics
+    # Run diagnostics (safe, read-only)
     $(basename "$0") diagnose
 
-    # Run all repairs
-    sudo $(basename "$0") repair
+    # Preview what repairs would do (no changes made)
+    $(basename "$0") --dry-run repair
 
-    # Interactive guided mode
-    sudo $(basename "$0") interactive
+    # Actually apply repairs (explicit opt-in)
+    sudo $(basename "$0") --apply-fixes repair
 
-    # Diagnose and auto-repair
-    sudo $(basename "$0") --auto-repair diagnose
+    # Interactive guided mode with repair capability
+    sudo $(basename "$0") --apply-fixes --interactive
 
     # Repair DNS only
-    sudo $(basename "$0") repair-dns
+    sudo $(basename "$0") --apply-fixes repair-dns
 
-    # Dry run (show what would be done)
-    $(basename "$0") --dry-run repair-all
+Safety Note:
+    Repair commands will show what would be fixed but won't make changes
+    unless --apply-fixes is specified. This prevents accidental modifications
+    to your network configuration.
 
 EOF
 }
@@ -143,11 +157,11 @@ run_all_diagnostics() {
     else
         log_warn "Diagnostics found ${total_issues} issue(s)"
 
-        if [[ "${AUTO_REPAIR}" == "true" ]]; then
+        if [[ "${APPLY_FIXES}" == "true" ]] && [[ "${AUTO_REPAIR}" == "true" ]]; then
             echo ""
-            log_info "Auto-repair is enabled, proceeding with repairs..."
+            log_info "Apply-fixes is enabled, proceeding with repairs..."
             run_all_repairs
-        elif [[ "${INTERACTIVE}" == "true" ]]; then
+        elif [[ "${APPLY_FIXES}" == "true" ]] && [[ "${INTERACTIVE}" == "true" ]]; then
             echo ""
             read -p "Would you like to attempt repairs? (y/N): " -n 1 -r
             echo
@@ -155,7 +169,8 @@ run_all_diagnostics() {
                 run_all_repairs
             fi
         else
-            log_info "Run with --auto-repair or --interactive to fix issues"
+            # Show hint about how to apply fixes
+            show_diagnostic_repair_hint "${total_issues}"
         fi
 
         return 1
@@ -165,6 +180,12 @@ run_all_diagnostics() {
 # Run all repairs
 run_all_repairs() {
     log_section "Complete Network Repair"
+
+    # Check for apply-fixes flag (safe mode check)
+    if ! require_apply_fixes "Network repair operations"; then
+        show_repair_blocked_banner
+        return 1
+    fi
 
     if [[ "${DRY_RUN}" == "true" ]]; then
         log_warn "DRY RUN MODE - No changes will be made"
@@ -240,16 +261,22 @@ EOF
     log_info "This tool will help diagnose and repair your internet connection."
     echo ""
 
-    # Check privileges
-    if ! check_privileges; then
-        log_warn "Some repairs will require root privileges"
-        read -p "Would you like to request sudo access now? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            require_root "Interactive repairs require root privileges"
+    # Show safe mode status
+    show_safe_mode_status
+    echo ""
+
+    # Check privileges if apply-fixes is enabled
+    if [[ "${APPLY_FIXES}" == "true" ]]; then
+        if ! check_privileges; then
+            log_warn "Repairs will require root privileges"
+            read -p "Would you like to request sudo access now? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                require_root "Interactive repairs require root privileges"
+            fi
+        else
+            log_success "Running with appropriate privileges"
         fi
-    else
-        log_success "Running with appropriate privileges"
     fi
 
     echo ""
@@ -261,8 +288,13 @@ EOF
         echo ""
         echo "  1) Run complete diagnostics"
         echo "  2) Run specific diagnostic"
-        echo "  3) Attempt automatic repairs"
-        echo "  4) Run specific repair"
+        if [[ "${APPLY_FIXES}" == "true" ]]; then
+            echo "  3) Attempt automatic repairs"
+            echo "  4) Run specific repair"
+        else
+            echo "  3) Attempt automatic repairs (requires --apply-fixes)"
+            echo "  4) Run specific repair (requires --apply-fixes)"
+        fi
         echo "  5) View backup files"
         echo "  6) Exit"
         echo ""
@@ -297,29 +329,39 @@ EOF
                 ;;
             3)
                 echo ""
-                read -p "This will attempt to automatically repair issues. Continue? (y/N): " -n 1 -r
-                echo
-                if [[ $REPLY =~ ^[Yy]$ ]]; then
-                    run_all_repairs
+                if ! require_apply_fixes "Automatic repairs"; then
+                    log_error "Repairs are disabled in safe mode"
+                    log_info "Restart with: sudo $(basename "$0") --apply-fixes --interactive"
+                else
+                    read -p "This will attempt to automatically repair issues. Continue? (y/N): " -n 1 -r
+                    echo
+                    if [[ $REPLY =~ ^[Yy]$ ]]; then
+                        run_all_repairs
+                    fi
                 fi
                 ;;
             4)
                 echo ""
-                log_info "Select repair:"
-                echo "  1) DNS"
-                echo "  2) Network Interfaces"
-                echo "  3) Routing"
-                echo "  4) NetworkManager"
-                read -p "Enter choice [1-4]: " repair_choice
+                if ! require_apply_fixes "Specific repairs"; then
+                    log_error "Repairs are disabled in safe mode"
+                    log_info "Restart with: sudo $(basename "$0") --apply-fixes --interactive"
+                else
+                    log_info "Select repair:"
+                    echo "  1) DNS"
+                    echo "  2) Network Interfaces"
+                    echo "  3) Routing"
+                    echo "  4) NetworkManager"
+                    read -p "Enter choice [1-4]: " repair_choice
 
-                echo ""
-                case ${repair_choice} in
-                    1) repair_dns ;;
-                    2) repair_interfaces ;;
-                    3) repair_routing ;;
-                    4) repair_networkmanager ;;
-                    *) log_error "Invalid choice" ;;
-                esac
+                    echo ""
+                    case ${repair_choice} in
+                        1) repair_dns ;;
+                        2) repair_interfaces ;;
+                        3) repair_routing ;;
+                        4) repair_networkmanager ;;
+                        *) log_error "Invalid choice" ;;
+                    esac
+                fi
                 ;;
             5)
                 echo ""
@@ -368,8 +410,22 @@ parse_args() {
                 shift
                 ;;
             -a|--auto-repair)
+                # Deprecated: now requires --apply-fixes as well
                 AUTO_REPAIR="true"
                 export AUTO_REPAIR
+                log_warn "--auto-repair is deprecated. Use --apply-fixes instead."
+                shift
+                ;;
+            --apply-fixes)
+                APPLY_FIXES="true"
+                AUTO_REPAIR="true"
+                export APPLY_FIXES AUTO_REPAIR
+                shift
+                ;;
+            --diagnose-only)
+                # Explicit diagnostic-only mode (default behavior)
+                APPLY_FIXES="false"
+                export APPLY_FIXES
                 shift
                 ;;
             -d|--dry-run)
@@ -389,38 +445,78 @@ parse_args() {
                 shift 2
                 ;;
             diagnose|diagnose-all)
+                show_safe_mode_status
+                echo ""
                 run_all_diagnostics
                 exit $?
                 ;;
             diagnose-dns)
+                show_safe_mode_status
+                echo ""
                 diagnose_dns
                 exit $?
                 ;;
             diagnose-network)
+                show_safe_mode_status
+                echo ""
                 diagnose_interfaces
                 exit $?
                 ;;
             diagnose-routing)
+                show_safe_mode_status
+                echo ""
                 diagnose_routing
                 exit $?
                 ;;
             repair|repair-all)
+                show_safe_mode_status
+                echo ""
                 run_all_repairs
                 exit $?
                 ;;
             repair-dns)
+                show_safe_mode_status
+                echo ""
+                if ! require_apply_fixes "DNS repair"; then
+                    show_repair_blocked_banner
+                    exit 1
+                fi
                 repair_dns
                 exit $?
                 ;;
             repair-network)
+                show_safe_mode_status
+                echo ""
+                if ! require_apply_fixes "Network interface repair"; then
+                    show_repair_blocked_banner
+                    exit 1
+                fi
                 repair_interfaces
                 exit $?
                 ;;
             repair-routing)
+                show_safe_mode_status
+                echo ""
+                if ! require_apply_fixes "Routing repair"; then
+                    show_repair_blocked_banner
+                    exit 1
+                fi
                 repair_routing
                 exit $?
                 ;;
+            repair-nm|repair-networkmanager)
+                show_safe_mode_status
+                echo ""
+                if ! require_apply_fixes "NetworkManager repair"; then
+                    show_repair_blocked_banner
+                    exit 1
+                fi
+                repair_networkmanager
+                exit $?
+                ;;
             interactive)
+                show_safe_mode_status
+                echo ""
                 run_interactive_mode
                 exit $?
                 ;;
@@ -441,12 +537,14 @@ main() {
     log_info "Complete Linux Internet Repair Tool v${VERSION}"
     echo ""
 
-    # Parse arguments
-    if [[ $# -eq 0 ]]; then
-        # No arguments, run diagnostics
-        run_all_diagnostics
-    else
+    # Parse arguments first (to set flags before showing status)
+    if [[ $# -gt 0 ]]; then
         parse_args "$@"
+    else
+        # No arguments, show safe mode status and run diagnostics
+        show_safe_mode_status
+        echo ""
+        run_all_diagnostics
     fi
 }
 
