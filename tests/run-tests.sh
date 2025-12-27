@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # Test runner for Complete Linux Internet Repair Tool
 
 set -euo pipefail
@@ -161,6 +162,13 @@ test_utilities() {
         print_result "FAIL" "System utility syntax check"
     fi
 
+    # Test safemode
+    if bash -n "${PROJECT_DIR}/src/utils/safemode.sh" 2>/dev/null; then
+        print_result "PASS" "Safemode utility syntax check"
+    else
+        print_result "FAIL" "Safemode utility syntax check"
+    fi
+
     echo ""
 }
 
@@ -230,6 +238,38 @@ test_permissions() {
     echo ""
 }
 
+# Test safe mode functionality
+test_safe_mode() {
+    echo -e "${BLUE}Testing Safe Mode${NC}"
+    echo ""
+
+    # Test that repairs are blocked by default
+    local output
+    output=$("${PROJECT_DIR}/network-repair" repair 2>&1) || true
+    if echo "${output}" | grep -q "SAFE MODE\|--apply-fixes\|Repair Operation Blocked"; then
+        print_result "PASS" "Repairs blocked in safe mode"
+    else
+        print_result "FAIL" "Repairs should be blocked in safe mode"
+    fi
+
+    # Test that diagnose works without flags
+    if "${PROJECT_DIR}/network-repair" diagnose >/dev/null 2>&1 || \
+       "${PROJECT_DIR}/network-repair" diagnose 2>&1 | grep -q "Diagnostic"; then
+        print_result "PASS" "Diagnose works in safe mode"
+    else
+        print_result "FAIL" "Diagnose should work in safe mode"
+    fi
+
+    # Test that --apply-fixes is documented in help
+    if "${PROJECT_DIR}/network-repair" --help 2>&1 | grep -q "apply-fixes"; then
+        print_result "PASS" "--apply-fixes documented in help"
+    else
+        print_result "FAIL" "--apply-fixes should be in help"
+    fi
+
+    echo ""
+}
+
 # Main test function
 main() {
     echo ""
@@ -244,6 +284,7 @@ main() {
     test_main
     test_installation
     test_permissions
+    test_safe_mode
 
     # Summary
     echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"
