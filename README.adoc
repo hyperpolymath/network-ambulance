@@ -1,400 +1,127 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-= Complete Linux Internet Repair
-
-image:https://img.shields.io/badge/license-AGPL--3.0-blue.svg[AGPL-3.0,link="https://www.gnu.org/licenses/agpl-3.0"] image:https://img.shields.io/badge/philosophy-Palimpsest-purple.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-licence"]
-:author: Hyperpolymath
-:toc: macro
+= Network Recovery Unit (Linux)
+image:https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg[AGPL-3.0,link="https://www.gnu.org/licenses/agpl-3.0"]
+image:https://img.shields.io/badge/Philosophy-Palimpsest-6a5acd.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-licence"]
+:toc:
 :toclevels: 3
 :icons: font
 :source-highlighter: rouge
-:experimental:
-:sectanchors:
 
-A comprehensive, automated toolkit for diagnosing and repairing internet connectivity issues on Linux systems.
+Network Recovery Unit is the AmbientOps module for diagnosing and repairing internet connectivity on Linux.
 
-toc::[]
+It is designed as the Linux counterpart to “Complete Internet Repair”-style tooling,
+but implemented with AmbientOps principles: plan-first changes, receipts, and safe defaults.
 
-== Overview
+[IMPORTANT]
+====
+*Project status:* *Re-scope / integration rewrite in progress*
 
-Complete Linux Internet Repair provides a modular, safety-focused approach to network troubleshooting. It supports multiple Linux distributions and offers both CLI and interactive modes for users of varying skill levels.
+This repo previously explored broader ambitions (traffic shaping, PAN setup, beyond-computer networking).
+Those are now v3 goals for AmbientOps. v1 here focuses on “get Linux online again” reliably.
+====
 
-=== Key Capabilities
+== Where it fits in AmbientOps
 
-[cols="1,3"]
-|===
-|Feature |Description
+Network Recovery Unit is used by:
 
-|*Comprehensive Diagnostics*
-|Six diagnostic modules covering DNS, network interfaces, routing, connectivity, firewall, and NetworkManager
+* **A&E (System Emergency Room)** for network emergencies (quick handoff)
+* **Operating Theatre** as a procedure pack (plan → apply with receipts)
+* **Ward** to surface calm “network health” signals (via System Weather)
+* **Records** to package a redaction-aware network incident bundle
 
-|*Automated Repairs*
-|Four repair modules with automatic backup, verification, and rollback capabilities
+== Design goals
 
-|*Multi-Distribution*
-|Tested on Ubuntu, Debian, Fedora, Arch, openSUSE and derivatives
+* Fix common connectivity failures quickly and safely
+* Work offline (as much as possible)
+* Prefer non-destructive actions and reversible steps
+* Produce evidence and receipts suitable for support/help forums
+* Cross-distribution best-effort (Ubuntu/Debian/Fedora/Arch first)
 
-|*Safety First*
-|Dry-run mode, automatic backups, confirmation prompts, privilege management
+== What it does (v1 scope)
 
-|*Dual Interface*
-|Full CLI for scripting + interactive guided mode for beginners
-|===
+Diagnostics (no root required where possible):
 
-== Quick Start
+* Interface status and link state
+* DHCP lease and address configuration sanity
+* Routing table and default gateway validation
+* DNS configuration and resolution checks
+* Connectivity tests (ICMP + HTTP/HTTPS where possible)
+* Firewall posture inspection (best-effort: nftables/iptables/UFW/firewalld)
+* Network manager state (NetworkManager/systemd-networkd where available)
 
-[source,bash]
+Repairs (root required for most):
+
+* Renew DHCP / reconfigure interface
+* Repair default route / gateway
+* Repair DNS resolver configuration
+* Restart or reconcile NetworkManager/systemd-networkd (guided)
+* Flush relevant caches (DNS, manager state) where appropriate
+
+== Commands (planned)
+
+The CLI mirrors the AmbientOps “scan/plan/apply” discipline:
+
 ----
-# Clone the repository
-git clone https://github.com/hyperpolymath/complete-linux-internet-repair.git
-cd complete-linux-internet-repair
-
-# Run diagnostics (no root required)
-./network-repair diagnose
-
-# Run repairs (requires root)
-sudo ./network-repair repair
-
-# Interactive guided mode
-sudo ./network-repair interactive
-----
-
-== Installation
-
-=== System-Wide Installation
-
-[source,bash]
-----
-sudo ./install.sh
-----
-
-This installs to `/opt/network-repair` and creates a symlink at `/usr/local/bin/network-repair`.
-
-=== Dependencies
-
-Required::
-* `bash` 4.0+
-* `iproute2` (ip command)
-* `iputils` (ping command)
-
-Optional (enhanced functionality)::
-* `dnsutils` / `bind-utils` (dig, nslookup)
-* `curl` or `wget` (HTTP testing)
-* `netcat` (port testing)
-* `NetworkManager` / `nmcli`
-
-== Usage
-
-=== Command Reference
-
-[source,bash]
-----
-network-repair [OPTIONS] [COMMAND]
+nru diagnose
+nru plan
+sudo nru apply
+sudo nru apply --dry-run
+nru export --bundle /path/to/incident
 ----
 
-==== Commands
+You may also provide targeted operations:
 
-[cols="2,4"]
-|===
-|Command |Description
-
-|`diagnose` / `diagnose-all`
-|Run all diagnostic checks (default if no command given)
-
-|`repair` / `repair-all`
-|Run all repair procedures (requires root)
-
-|`interactive`
-|Launch interactive guided troubleshooting mode
-
-|`diagnose-dns`
-|Diagnose DNS configuration and resolution
-
-|`diagnose-network`
-|Diagnose network interface status
-
-|`diagnose-routing`
-|Diagnose routing table and gateway
-
-|`repair-dns`
-|Repair DNS configuration issues
-
-|`repair-network`
-|Repair network interface issues
-
-|`repair-routing`
-|Repair routing table issues
-|===
-
-==== Options
-
-[cols="2,4"]
-|===
-|Option |Description
-
-|`-h, --help`
-|Display help message
-
-|`-v, --version`
-|Display version information
-
-|`-V, --verbose`
-|Enable verbose output
-
-|`-q, --quiet`
-|Quiet mode (errors only)
-
-|`-i, --interactive`
-|Run in interactive mode
-
-|`-a, --auto-repair`
-|Automatically repair found issues
-
-|`-d, --dry-run`
-|Show what would be done without making changes
-
-|`--no-color`
-|Disable colored output
-
-|`--log-file FILE`
-|Write logs to specified file
-|===
-
-=== Examples
-
-[source,bash]
 ----
-# Basic diagnostics
-./network-repair diagnose
-
-# Diagnose and auto-repair
-sudo ./network-repair --auto-repair diagnose
-
-# Dry-run to preview changes
-./network-repair --dry-run repair-all
-
-# Verbose DNS diagnostics
-./network-repair --verbose diagnose-dns
-
-# Log to file
-sudo ./network-repair --log-file /tmp/repair.log repair
+nru diagnose dns|iface|route|firewall|manager
+sudo nru apply dns|iface|route|manager
 ----
 
-== Architecture
+== Safety guarantees
 
-=== Module Structure
+Network Recovery Unit will never:
 
-[source]
-----
-complete-linux-internet-repair/
-├── network-repair           # Main entry point wrapper
-├── install.sh               # System-wide installer
-├── src/
-│   ├── main.sh              # Core orchestration logic
-│   ├── diagnostics/
-│   │   ├── dns.sh           # DNS configuration & resolution checks
-│   │   ├── interfaces.sh    # Network interface status & configuration
-│   │   ├── routing.sh       # Routing table & gateway diagnostics
-│   │   ├── connectivity.sh  # Ping, HTTP, port connectivity tests
-│   │   ├── firewall.sh      # iptables, nftables, UFW, firewalld
-│   │   └── networkmanager.sh # NetworkManager status & conflicts
-│   ├── repairs/
-│   │   ├── dns.sh           # DNS repair procedures
-│   │   ├── interfaces.sh    # Interface up/down, DHCP renewal
-│   │   ├── routing.sh       # Default route, duplicate removal
-│   │   └── networkmanager.sh # NM restart, reconnection, conflicts
-│   └── utils/
-│       ├── colors.sh        # Terminal color support
-│       ├── logging.sh       # Multi-level logging system
-│       ├── privileges.sh    # Root/sudo privilege management
-│       ├── backup.sh        # Config file backup & restore
-│       └── system.sh        # Distribution & network detection
-├── tests/
-│   ├── run-tests.sh         # Test suite runner
-│   └── test-utils.sh        # Test utilities
-├── config/
-│   └── defaults.conf        # Default configuration values
-└── docs/
-    ├── ARCHITECTURE.md      # Detailed architecture documentation
-    ├── ACCESSIBILITY.md     # Accessibility guidelines
-    ├── I18N.md              # Internationalization info
-    └── troubleshooting.md   # Manual troubleshooting guide
-----
+* delete user data
+* “open ports” without explicit user consent
+* disable security controls silently
+* make undocumented permanent changes without a receipt
 
-=== Diagnostic Modules
+Any mutating action must:
 
-[cols="1,2,2"]
-|===
-|Module |Checks |Key Functions
+* be represented as a plan first
+* declare required privileges
+* declare reversibility level
+* emit a receipt and evidence pointers
 
-|*dns.sh*
-|resolv.conf, systemd-resolved, DNS servers, resolution
-|`check_dns_config()`, `test_dns_resolution()`, `test_dns_servers()`
+== Outputs
 
-|*interfaces.sh*
-|Interface status, IP assignment, link state, statistics
-|`check_interfaces()`, `check_primary_interface()`, `check_interface_stats()`
+Network Recovery Unit produces artifacts aligned with `system-tools-contracts`:
 
-|*routing.sh*
-|Default route, gateway reachability, IPv6, ARP table
-|`check_routing_table()`, `test_internet_route()`, `check_arp_table()`
+* Evidence envelope references (diagnostics)
+* Procedure plan (steps, previews, risk labels)
+* Run bundle (standard folder layout)
+* Receipt (human + machine)
 
-|*connectivity.sh*
-|Ping, DNS resolution, HTTP/HTTPS, ports, MTU, latency
-|`test_basic_connectivity()`, `test_http_connectivity()`, `test_mtu()`
+== Implementation approach (recommended)
 
-|*firewall.sh*
-|iptables, nftables, UFW, firewalld rules and policies
-|`check_iptables()`, `check_ufw()`, `check_firewalld()`
+* Core: **D**
+  - robust CLI, orchestration, cross-distro detection
+* Optional: **Rust helpers**
+  - privileged, safety-critical execution paths (tight sandbox boundaries)
 
-|*networkmanager.sh*
-|NM status, connections, devices, conflicts
-|`check_nm_status()`, `check_nm_connections()`, `check_nm_conflicts()`
-|===
+Elixir/BEAM is excellent for coordination layers, but for Linux networking repair it is less suitable than D/Rust because the work is mostly system integration and privileged operations.
 
-=== Repair Modules
+== Directory layout (proposed)
 
-[cols="1,2,2"]
-|===
-|Module |Repairs |Key Functions
-
-|*dns.sh*
-|Create/fix resolv.conf, reset DNS, flush cache, configure NM DNS
-|`repair_dns_config()`, `reset_dns_to_defaults()`, `flush_dns_cache()`
-
-|*interfaces.sh*
-|Bring up interfaces, renew DHCP, reset to DHCP
-|`interface_up()`, `renew_dhcp()`, `reset_interface_dhcp()`
-
-|*routing.sh*
-|Add default route, remove duplicates, flush & rebuild
-|`add_default_route()`, `remove_duplicate_routes()`, `flush_routing_table()`
-
-|*networkmanager.sh*
-|Restart NM, reconnect, resolve conflicts, reset connections
-|`restart_networkmanager()`, `reconnect_nm_connection()`, `repair_nm_conflicts()`
-|===
-
-== Safety Features
-
-=== Automatic Backups
-
-Before modifying any configuration file, the tool automatically creates timestamped backups:
-
-[source,bash]
-----
-~/.network-repair-backups/
-├── resolv.conf.20241226_143022
-├── resolv.conf.20241226_151847
-└── ...
-----
-
-=== Dry-Run Mode
-
-Preview all changes without modifying the system:
-
-[source,bash]
-----
-./network-repair --dry-run repair-all
-----
-
-=== Privilege Management
-
-* Diagnostics run without root privileges
-* Repairs automatically request sudo when needed
-* Clear indication of required privileges
-* Sudo session maintained for batch operations
-
-== Distribution Support
-
-[cols="2,1,2"]
-|===
-|Distribution |Status |Network Managers
-
-|Ubuntu 20.04, 22.04, 24.04
-|Tested
-|NetworkManager, netplan
-
-|Debian 11, 12
-|Tested
-|NetworkManager, ifupdown
-
-|Fedora 38, 39, 40
-|Tested
-|NetworkManager
-
-|Arch Linux
-|Tested
-|NetworkManager, systemd-networkd
-
-|openSUSE Tumbleweed/Leap
-|Supported
-|NetworkManager, wicked
-
-|Linux Mint, Pop!_OS
-|Supported
-|NetworkManager
-|===
-
-== Configuration
-
-Default settings can be overridden via environment variables or `/opt/network-repair/config/defaults.conf`:
-
-[source,bash]
-----
-# Logging
-LOG_LEVEL=INFO              # DEBUG, INFO, WARN, ERROR, FATAL
-VERBOSE=false
-LOG_TO_FILE=false
-LOG_FILE=/var/log/network-repair.log
-
-# Behavior
-INTERACTIVE=false
-AUTO_REPAIR=false
-DRY_RUN=false
-
-# DNS defaults
-DEFAULT_DNS_SERVERS="8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1"
-
-# Timeouts
-PING_TIMEOUT=3
-DHCP_TIMEOUT=30
-----
-
-== Testing
-
-[source,bash]
-----
-# Run the test suite
-./tests/run-tests.sh
-----
-
-The test suite validates:
-
-* Bash syntax for all scripts
-* Module loading
-* Help and version commands
-* File permissions
-* Installation script
-
-== Uninstallation
-
-[source,bash]
-----
-sudo /opt/network-repair/uninstall.sh
-----
-
-== Contributing
-
-See link:CONTRIBUTING.md[CONTRIBUTING.md] for contribution guidelines.
+* `src/` — main CLI + orchestration
+* `modules/diagnostics/` — diagnostic checks
+* `modules/repairs/` — repair actions (plan/apply)
+* `schemas/` — local copies/links to relevant contracts
+* `examples/` — sample bundles and receipts
+* `docs/` — distro notes, safety notes, troubleshooting
 
 == License
 
-AGPL-3.0-or-later
+AGPL-3.0-or-later.
 
-See link:LICENSE.txt[LICENSE.txt] for the full license text.
+== Roadmap
 
-== Acknowledgments
-
-* Google, Cloudflare, and Quad9 for reliable public DNS
-* The Linux networking community
-* All contributors and testers
+See `ROADMAP.adoc`.
