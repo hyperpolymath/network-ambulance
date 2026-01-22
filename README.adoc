@@ -4,7 +4,7 @@ image:https://img.shields.io/badge/License-MPL_2.0-blue.svg[MPL-2.0,link="https:
 image:https://img.shields.io/badge/Philosophy-Palimpsest-purple.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-licence"]
 
 
-image:[AGPL-3.0,link="https://www.gnu.org/licenses/agpl-3.0"]
+image:[PMPL-1.0,link="https://github.com/hyperpolymath/palimpsest-license"]
 image:[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-licence"]
 :toc:
 :toclevels: 3
@@ -125,7 +125,7 @@ Elixir/BEAM is excellent for coordination layers, but for Linux networking repai
 
 == License
 
-AGPL-3.0-or-later.
+PMPL-1.0-or-later.
 
 == Roadmap
 
