@@ -1,0 +1,703 @@
+= AmbientOps Integration
+:toc:
+:toclevels: 3
+:icons: font
+
+How Network Ambulance integrates with the link:https://github.com/hyperpolymath/ambientops[AmbientOps] ecosystem.
+
+== Overview
+
+Network Ambulance is an **Operating Room procedure pack** in the AmbientOps ecosystem. It provides specialized network diagnostics and repair capabilities that follow AmbientOps principles:
+
+* Evidence-first (no fearware)
+* Safety by default (non-destructive)
+* Explicit approval required
+* Undo/receipts are first-class
+* Local-only by default (privacy)
+
+== The Hospital Model
+
+AmbientOps uses a "hospital" metaphor with four departments:
+
+[cols="1,2,2"]
+|===
+|Department |Purpose |Network Ambulance Role
+
+|**Ward**
+|Daily system health monitoring (System Weather)
+|Provides quick network health signals
+
+|**Emergency Room**
+|Panic-safe emergency intake
+|Handles network emergencies with calm diagnostics
+
+|**Operating Room**
+|Planned procedures (Scan → Plan → Apply)
+|Primary home - full diagnostic and repair workflows
+
+|**Records**
+|Receipts, undo tokens, help bundles
+|Generates shareable incident bundles
+|===
+
+== Integration Points
+
+=== 1. Operating Room Integration
+
+Network Ambulance is a **procedure pack** for the Operating Room.
+
+==== Workflow Alignment
+
+Network Ambulance follows the Operating Room's Scan → Plan → Apply → Receipt workflow:
+
+[source,text]
+----
+1. SCAN (Diagnose)
+   └─> network-repair diagnose
+       Produces: Evidence envelope
+
+2. PLAN (What would be fixed)
+   └─> network-repair repair --dry-run
+       Produces: Procedure plan
+
+3. APPLY (Execute repairs)
+   └─> sudo network-repair repair
+       Requires: User approval
+       Produces: Receipt + undo token
+
+4. RECEIPT (Audit trail)
+   └─> Automatic receipt generation
+       Format: system-tools-contracts compliant
+----
+
+==== Evidence Envelope Format
+
+Network Ambulance produces evidence envelopes compatible with `system-tools-contracts`:
+
+[source,json]
+----
+{
+  "schema": "ambientops/evidence-envelope/v1",
+  "timestamp": "2026-01-29T15:30:00Z",
+  "tool": "network-ambulance",
+  "version": "1.0.0",
+  "scan_results": {
+    "dns": {
+      "status": "degraded",
+      "findings": ["No working nameservers in /etc/resolv.conf"],
+      "metrics": {
+        "resolution_time_ms": null,
+        "servers_reachable": 0,
+        "servers_configured": 0
+      }
+    },
+    "interfaces": {
+      "status": "healthy",
+      "findings": [],
+      "devices": [
+        {
+          "name": "wlp3s0",
+          "state": "up",
+          "ip": "10.45.253.69/24",
+          "mac": "b8:8a:60:a3:2c:d0"
+        }
+      ]
+    },
+    "routing": {
+      "status": "healthy",
+      "findings": [],
+      "default_route": "10.45.253.205"
+    }
+  }
+}
+----
+
+==== Procedure Plan Format
+
+[source,json]
+----
+{
+  "schema": "ambientops/procedure-plan/v1",
+  "tool": "network-ambulance",
+  "plan_id": "repair-2026-01-29-153000",
+  "steps": [
+    {
+      "id": 1,
+      "action": "dns.repair_resolv_conf",
+      "description": "Add Google DNS (8.8.8.8, 8.8.4.4) to /etc/resolv.conf",
+      "requires_root": true,
+      "reversible": true,
+      "risk_level": "low",
+      "estimated_duration_sec": 2
+    },
+    {
+      "id": 2,
+      "action": "dns.restart_systemd_resolved",
+      "description": "Restart systemd-resolved service",
+      "requires_root": true,
+      "reversible": true,
+      "risk_level": "low",
+      "estimated_duration_sec": 3
+    }
+  ],
+  "total_steps": 2,
+  "requires_root": true,
+  "estimated_total_duration_sec": 5,
+  "reversible": true,
+  "max_risk_level": "low"
+}
+----
+
+==== Receipt Format
+
+[source,json]
+----
+{
+  "schema": "ambientops/procedure-receipt/v1",
+  "tool": "network-ambulance",
+  "plan_id": "repair-2026-01-29-153000",
+  "execution_timestamp": "2026-01-29T15:30:05Z",
+  "user": "hyper",
+  "hostname": "thinkpad",
+  "steps_executed": [
+    {
+      "id": 1,
+      "action": "dns.repair_resolv_conf",
+      "status": "success",
+      "duration_sec": 1.8,
+      "changes": [
+        {
+          "file": "/etc/resolv.conf",
+          "action": "modified",
+          "backup": "/var/backups/network-ambulance/resolv.conf-2026-01-29-153004"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "action": "dns.restart_systemd_resolved",
+      "status": "success",
+      "duration_sec": 2.3
+    }
+  ],
+  "overall_status": "success",
+  "total_duration_sec": 4.1,
+  "undo_token": "undo-repair-2026-01-29-153000",
+  "undo_command": "network-repair restore --token undo-repair-2026-01-29-153000"
+}
+----
+
+==== Undo Token Format
+
+[source,json]
+----
+{
+  "schema": "ambientops/undo-token/v1",
+  "token_id": "undo-repair-2026-01-29-153000",
+  "created": "2026-01-29T15:30:05Z",
+  "tool": "network-ambulance",
+  "backups": [
+    {
+      "original_path": "/etc/resolv.conf",
+      "backup_path": "/var/backups/network-ambulance/resolv.conf-2026-01-29-153004",
+      "checksum_sha256": "abc123..."
+    }
+  ],
+  "restore_steps": [
+    {
+      "action": "restore_file",
+      "file": "/etc/resolv.conf",
+      "from_backup": "/var/backups/network-ambulance/resolv.conf-2026-01-29-153004"
+    },
+    {
+      "action": "restart_service",
+      "service": "systemd-resolved"
+    }
+  ]
+}
+----
+
+==== CLI Integration
+
+Operating Room can invoke Network Ambulance via standard CLI:
+
+[source,bash]
+----
+# Scan phase
+network-repair diagnose --format json > evidence.json
+
+# Plan phase
+network-repair repair --dry-run --format json > plan.json
+
+# Apply phase (with approval)
+sudo network-repair apply --plan plan.json --format json > receipt.json
+
+# Undo (if needed)
+sudo network-repair restore --token undo-repair-2026-01-29-153000
+----
+
+=== 2. Ward Integration
+
+Network Ambulance provides **quick health signals** for System Weather display.
+
+==== Health Check API
+
+[source,bash]
+----
+network-repair status --format weather
+----
+
+Output format:
+
+[source,json]
+----
+{
+  "schema": "ambientops/system-weather/v1",
+  "component": "network",
+  "status": "healthy|degraded|down",
+  "status_emoji": "🟢|🟡|🔴",
+  "summary": "Network is healthy",
+  "details": {
+    "connectivity": "up",
+    "dns": "healthy",
+    "latency_ms": 12,
+    "last_check": "2026-01-29T15:30:00Z"
+  },
+  "execution_time_ms": 850
+}
+----
+
+Status levels:
+
+* **🟢 healthy** — All connectivity tests pass, latency <50ms
+* **🟡 degraded** — Connected but slow (latency >100ms) or DNS issues
+* **🔴 down** — No connectivity or critical failures
+
+==== Ward Display
+
+System Weather in Ward shows:
+
+[source,text]
+----
+┌─ System Weather ────────────────┐
+│                                  │
+│ 🌤️  Mostly Healthy               │
+│                                  │
+│ CPU:     🟢 12% (cool)           │
+│ Memory:  🟢 4.2GB / 16GB         │
+│ Disk:    🟢 120GB free           │
+│ Network: 🟢 Connected (12ms)     │  ← From Network Ambulance
+│                                  │
+└──────────────────────────────────┘
+----
+
+If network is degraded:
+
+[source,text]
+----
+│ Network: 🟡 Slow DNS (220ms)     │
+│   → Run Network Ambulance        │  ← Actionable hint
+----
+
+==== Performance Requirements
+
+* **Execution time:** <1 second
+* **No root required:** Runs as regular user
+* **No side effects:** Read-only, no repairs
+* **Graceful degradation:** Returns cached status if can't check
+
+Implementation:
+
+* Uses lightweight checks (ping 1 packet, DNS cache only)
+* Caches results for 60 seconds
+* Falls back to "unknown" if checks hang
+
+=== 3. Emergency Room Integration
+
+Network Ambulance handles **network emergencies** with calm, panic-safe UX.
+
+==== Emergency Mode
+
+When user clicks "Network Emergency" in Emergency Room:
+
+[source,bash]
+----
+network-repair emergency
+----
+
+Behavior:
+
+1. **Quick triage** (5 seconds max)
+   - Can we reach the internet at all?
+   - Is DNS working?
+   - Is this a known common issue?
+
+2. **Calm, simple output**
+   - No technical jargon
+   - No scary error messages
+   - Plain English explanations
+
+3. **One-click repair options**
+   - "Try fixing DNS" (most common)
+   - "Reset network completely" (nuclear option)
+   - "Show me more details" (handoff to OR)
+
+Example emergency output:
+
+[source,text]
+----
+Network Emergency Triage
+========================
+
+Your internet isn't working.
+
+I found the problem:
+  → Your DNS settings are broken
+
+This usually happens after:
+  • VPN disconnection
+  • System updates
+  • Switching networks
+
+What would you like to do?
+
+[1] Try fixing DNS automatically (recommended)
+[2] Show me technical details
+[3] Get help from Network Ambulance (full diagnostics)
+
+Your choice:
+----
+
+==== Emergency Repairs
+
+Emergency mode offers **safe, common repairs only**:
+
+* Fix DNS (add Google/Cloudflare DNS)
+* Renew DHCP lease
+* Restart NetworkManager
+* Reset to working defaults
+
+**Never offered in emergency mode:**
+
+* Firewall changes
+* Routing table modifications
+* Advanced configurations
+* Anything that requires deep understanding
+
+==== Handoff to Operating Room
+
+If user selects "Show technical details" or issue is complex:
+
+1. Emergency Room generates incident bundle
+2. Hands off to Operating Room
+3. Operating Room launches full Network Ambulance diagnostics
+4. User gets complete diagnostic report + guided repair
+
+=== 4. Records Integration
+
+Network Ambulance generates **shareable incident bundles** for Records.
+
+==== Incident Bundle Structure
+
+[source,bash]
+----
+network-repair export --bundle /tmp/network-incident-20260129
+----
+
+Generates:
+
+[source,text]
+----
+/tmp/network-incident-20260129/
+├── metadata.json           # Machine-readable summary
+├── README.txt              # Human-readable summary
+├── diagnostics/
+│   ├── full-diagnostics.txt
+│   ├── dns-diagnostics.txt
+│   ├── interface-diagnostics.txt
+│   ├── routing-diagnostics.txt
+│   ├── connectivity-diagnostics.txt
+│   ├── firewall-diagnostics.txt
+│   └── networkmanager-diagnostics.txt
+├── system-info/
+│   ├── distribution.txt    # OS version
+│   ├── kernel.txt          # Kernel version
+│   ├── hardware.txt        # Network hardware
+│   └── network-managers.txt # NM, systemd-networkd status
+├── configs/                # Sanitized configs
+│   ├── resolv.conf
+│   ├── NetworkManager.conf
+│   ├── interfaces (if exists)
+│   └── netplan/ (if exists)
+├── logs/                   # Relevant logs (last 100 lines)
+│   ├── networkmanager.log
+│   ├── syslog-network.log
+│   └── dmesg-network.log
+└── receipts/               # If repairs were attempted
+    ├── repair-receipt.json
+    └── undo-token.json
+----
+
+==== Privacy & Sanitization
+
+Automatic sanitization (default):
+
+* IP addresses → `<REDACTED IP>`
+* MAC addresses → `<REDACTED MAC>` (keeps first 3 octets for vendor ID)
+* Hostnames → `<REDACTED HOSTNAME>`
+* Usernames → `<REDACTED USER>`
+* WiFi passwords → Always removed
+* VPN credentials → Always removed
+
+User can control sanitization:
+
+[source,bash]
+----
+# Full sanitization (default)
+network-repair export --bundle /tmp/incident
+
+# Keep IPs (for detailed debugging)
+network-repair export --bundle /tmp/incident --keep-ips
+
+# Keep everything (dangerous - review before sharing!)
+network-repair export --bundle /tmp/incident --no-sanitize
+----
+
+==== Shareable Formats
+
+Bundle can be exported as:
+
+* **Directory** (default) — Easy to review
+* **Tarball** — `network-incident-20260129.tar.gz`
+* **Markdown** — Single markdown file for GitHub issues/forums
+
+[source,bash]
+----
+# Tarball for easy sharing
+network-repair export --bundle /tmp/incident --format tar.gz
+
+# Markdown for GitHub issue
+network-repair export --bundle /tmp/incident --format markdown > issue.md
+----
+
+Markdown format is ideal for forum posts:
+
+[source,markdown]
+----
+# Network Issue - 2026-01-29
+
+## Summary
+Cannot access internet. DNS resolution failing.
+
+## System Info
+- Distribution: Fedora 43
+- Kernel: 6.18.7
+- Network Manager: NetworkManager 1.45
+
+## Diagnostics
+
+### DNS
+- Status: FAILED
+- resolv.conf: Empty (no nameservers)
+- systemd-resolved: inactive
+
+### Interfaces
+- wlp3s0: UP, connected to "Home WiFi"
+- IP: 10.45.253.69/24
+
+### Routing
+- Default route: ✓ via 10.45.253.205
+- Gateway reachable: ✓
+
+## Attempts to Fix
+1. Added Google DNS (8.8.8.8)
+2. Restarted systemd-resolved
+3. Result: SUCCESS - internet now working
+
+---
+Generated by Network Ambulance 1.0.0
+----
+
+=== 5. System Tools Contracts
+
+Network Ambulance follows `system-tools-contracts` schemas for all structured output.
+
+==== Contracts Used
+
+[cols="1,2"]
+|===
+|Contract |Purpose
+
+|`evidence-envelope/v1`
+|Diagnostic scan results
+
+|`procedure-plan/v1`
+|Repair plan before execution
+
+|`procedure-receipt/v1`
+|Repair execution record
+
+|`undo-token/v1`
+|Rollback instructions
+
+|`system-weather/v1`
+|Quick health status
+
+|`incident-bundle/v1`
+|Shareable help bundle
+|===
+
+==== Validation
+
+Network Ambulance validates all output against contracts:
+
+[source,bash]
+----
+# Validate evidence envelope
+network-repair diagnose --format json | \
+  contract-validator --schema evidence-envelope/v1
+
+# Validate procedure plan
+network-repair repair --dry-run --format json | \
+  contract-validator --schema procedure-plan/v1
+----
+
+If validation fails, Network Ambulance falls back to human-readable text output.
+
+== Command Line Integration
+
+=== For Operating Room
+
+[source,bash]
+----
+# Scan phase
+OR_EVIDENCE=$(network-repair diagnose --format json)
+
+# Plan phase
+OR_PLAN=$(network-repair repair --dry-run --format json)
+
+# Apply phase (after user approval)
+OR_RECEIPT=$(sudo network-repair apply --plan "$OR_PLAN" --format json)
+
+# Undo phase (if needed)
+UNDO_TOKEN=$(echo "$OR_RECEIPT" | jq -r '.undo_token')
+sudo network-repair restore --token "$UNDO_TOKEN"
+----
+
+=== For Ward
+
+[source,bash]
+----
+# Quick health check (cached, <1s)
+NETWORK_STATUS=$(network-repair status --format weather)
+
+# Display in System Weather
+echo "$NETWORK_STATUS" | jq -r '.status_emoji + " " + .summary'
+# Output: 🟢 Network is healthy
+----
+
+=== For Emergency Room
+
+[source,bash]
+----
+# Emergency triage
+network-repair emergency
+
+# Or automated emergency fix
+sudo network-repair emergency --auto-fix
+----
+
+=== For Records
+
+[source,bash]
+----
+# Generate incident bundle
+network-repair export \
+  --bundle /var/ambientops/records/network-incident-20260129 \
+  --format tar.gz \
+  --sanitize
+
+# Upload to Records database
+ambientops-records import \
+  /var/ambientops/records/network-incident-20260129.tar.gz
+----
+
+== Configuration
+
+=== AmbientOps Settings
+
+Network Ambulance reads AmbientOps configuration:
+
+[source,toml]
+----
+# ~/.config/ambientops/config.toml
+
+[network-ambulance]
+# Default behavior
+auto_backup = true
+backup_dir = "/var/backups/network-ambulance"
+log_dir = "/var/log/network-ambulance"
+
+# Operating Room integration
+output_format = "json"          # json|text|markdown
+contract_validation = true      # Validate against system-tools-contracts
+
+# Ward integration
+health_check_interval_sec = 60  # Cache health status for 60s
+health_check_timeout_sec = 1    # Abort health check after 1s
+
+# Emergency Room integration
+emergency_mode_timeout_sec = 5  # Max time for emergency triage
+
+# Records integration
+incident_bundle_sanitize = true # Auto-sanitize by default
+incident_bundle_format = "tar.gz"
+----
+
+=== Environment Variables
+
+[source,bash]
+----
+# Operating Room integration
+export AMBIENTOPS_MODE=operating-room
+export AMBIENTOPS_OUTPUT_FORMAT=json
+
+# Ward integration
+export AMBIENTOPS_MODE=ward
+export AMBIENTOPS_HEALTH_CHECK_CACHE=60
+
+# Emergency Room integration
+export AMBIENTOPS_MODE=emergency
+export AMBIENTOPS_EMERGENCY_TIMEOUT=5
+----
+
+Network Ambulance adapts behavior based on `AMBIENTOPS_MODE`:
+
+* `operating-room` — Full diagnostics, structured output, receipts
+* `ward` — Quick checks only, cached results
+* `emergency` — Calm UX, simple repairs only
+* `standalone` (default) — Full featured CLI
+
+== Roadmap: Enhanced Integration
+
+=== v1.2 Enhancements
+
+* **Plugin API** for custom diagnostic/repair modules
+* **Real-time event streaming** to AmbientOps observability
+* **Policy-gated repairs** via Hybrid Automation Router
+
+=== v2.0 Vision
+
+* **Full D/V rewrite** (D for execution, V for verification)
+* **Web UI** integrated with AmbientOps dashboard
+* **Remote diagnostics** via AmbientOps orchestration
+
+== See Also
+
+* link:https://github.com/hyperpolymath/ambientops[AmbientOps] — Umbrella project
+* link:https://github.com/hyperpolymath/operating-room[Operating Room] — Procedure engine
+* link:https://github.com/hyperpolymath/system-tools-contracts[System Tools Contracts] — Shared schemas
+
+---
+
+Last updated: 2026-01-29

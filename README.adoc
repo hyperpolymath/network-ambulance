@@ -1,132 +1,674 @@
-= Network Ambulance (for Linux)
-
-image:https://img.shields.io/badge/License-PMPL--1.0-blue.svg[License: PMPL-1.0,link="https://github.com/hyperpolymath/palimpsest-license"]
-image:https://img.shields.io/badge/Philosophy-Palimpsest-indigo.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-license"]
-
-
-image:[PMPL-1.0,link="https://github.com/hyperpolymath/palimpsest-license"]
-image:[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-license"]
+= Network Ambulance
 :toc:
 :toclevels: 3
 :icons: font
 :source-highlighter: rouge
 
-Network Recovery Unit is the AmbientOps module for diagnosing and repairing internet connectivity on Linux.
+image:https://img.shields.io/badge/License-PMPL--1.0-blue.svg[License: PMPL-1.0,link="https://github.com/hyperpolymath/palimpsest-license"]
+image:https://img.shields.io/badge/Philosophy-Palimpsest-indigo.svg[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-license"]
+image:https://img.shields.io/badge/Version-1.0.0-success.svg[Version]
+image:https://img.shields.io/badge/Status-Production_Ready-brightgreen.svg[Status]
 
-It is designed as the Linux counterpart to “Complete Internet Repair”-style tooling,
-but implemented with AmbientOps principles: plan-first changes, receipts, and safe defaults.
+*Your Linux internet stopped working. Network Ambulance gets you back online.*
 
-[IMPORTANT]
-====
-*Project status:* *Re-scope / integration rewrite in progress*
+Network Ambulance is a comprehensive diagnostic and repair tool for Linux network connectivity issues. Unlike random forum advice or risky "optimizer" tools, it provides *safe, documented, reversible* network repairs with *full evidence trails*.
 
-This repo previously explored broader ambitions (traffic shaping, PAN setup, beyond-computer networking).
-Those are now v3 goals for AmbientOps. v1 here focuses on “get Linux online again” reliably.
-====
+[quote]
+____
+"It's 2am, your internet is down, and you have a deadline. You don't need a networking degree—you need Network Ambulance."
+____
 
-== Where it fits in AmbientOps
+== The Problem
 
-Network Recovery Unit is used by:
+You've been there:
 
-* **A&E (System Emergency Room)** for network emergencies (quick handoff)
-* **Operating Theatre** as a procedure pack (plan → apply with receipts)
-* **Ward** to surface calm “network health” signals (via System Weather)
-* **Records** to package a redaction-aware network incident bundle
+* WiFi connected but no internet
+* "No internet connection" despite working yesterday
+* DNS not resolving, pages won't load
+* VPN broke your routing table
+* NetworkManager conflicts with system settings
+* Browser says "DNS_PROBE_FINISHED_NO_INTERNET"
 
-== Design goals
+You search forums. You find 50 different solutions. Half are outdated. Some are dangerous (`sudo rm -rf /etc/NetworkManager`). You don't know which to trust.
 
-* Fix common connectivity failures quickly and safely
-* Work offline (as much as possible)
-* Prefer non-destructive actions and reversible steps
-* Produce evidence and receipts suitable for support/help forums
-* Cross-distribution best-effort (Ubuntu/Debian/Fedora/Arch first)
+**Network Ambulance solves this.**
 
-== What it does (v1 scope)
+== What It Does
 
-Diagnostics (no root required where possible):
+Network Ambulance provides *systematic, expert-level diagnostics and repairs* for common Linux connectivity failures—without requiring you to be a networking expert.
 
-* Interface status and link state
-* DHCP lease and address configuration sanity
-* Routing table and default gateway validation
-* DNS configuration and resolution checks
-* Connectivity tests (ICMP + HTTP/HTTPS where possible)
-* Firewall posture inspection (best-effort: nftables/iptables/UFW/firewalld)
-* Network manager state (NetworkManager/systemd-networkd where available)
+=== 🔍 Comprehensive Diagnostics
 
-Repairs (root required for most):
+Network Ambulance checks *everything* that can break internet connectivity:
 
-* Renew DHCP / reconfigure interface
-* Repair default route / gateway
-* Repair DNS resolver configuration
-* Restart or reconcile NetworkManager/systemd-networkd (guided)
-* Flush relevant caches (DNS, manager state) where appropriate
+[cols="1,3"]
+|===
+|Area |What It Checks
 
-== Commands (planned)
+|**DNS**
+|`resolv.conf` validity, systemd-resolved status, DNS server reachability, resolution tests, cache stats
 
-The CLI mirrors the AmbientOps “scan/plan/apply” discipline:
+|**Network Interfaces**
+|Interface status, IP configuration, MAC addresses, link state, driver info, statistics, conflicts
 
+|**Routing**
+|Default route presence, gateway reachability, IPv6 routing, policy rules, metrics, ARP table
+
+|**Connectivity**
+|ICMP ping tests, HTTP/HTTPS verification, port connectivity, MTU discovery, latency measurement
+
+|**Firewall**
+|iptables rules, nftables, UFW status, firewalld zones, policy analysis
+
+|**Network Manager**
+|NetworkManager/systemd-networkd status, active connections, device states, conflicts
+|===
+
+=== 🔧 Safe, Documented Repairs
+
+When Network Ambulance finds problems, it can fix them—*safely*:
+
+* **DNS repairs**: Fix `resolv.conf`, add reliable DNS servers, restart systemd-resolved, flush caches
+* **Interface repairs**: Bring up interfaces, renew DHCP leases, fix down interfaces
+* **Routing repairs**: Add missing default routes, remove duplicates, repair gateway configuration
+* **NetworkManager repairs**: Restart service, reconnect, resolve conflicts, reset problematic connections
+
+Every repair:
+
+* ✓ Shows you what it will do *before* doing it (dry-run mode)
+* ✓ Creates automatic backups
+* ✓ Generates receipts for audit trails
+* ✓ Can be undone if something goes wrong
+
+== Quick Start
+
+=== Installation
+
+[source,bash]
 ----
-nru diagnose
-nru plan
-sudo nru apply
-sudo nru apply --dry-run
-nru export --bundle /path/to/incident
+git clone https://github.com/hyperpolymath/network-ambulance.git
+cd network-ambulance
+sudo ./install.sh
 ----
 
-You may also provide targeted operations:
+Or download and install in one command:
 
+[source,bash]
 ----
-nru diagnose dns|iface|route|firewall|manager
-sudo nru apply dns|iface|route|manager
+curl -fsSL https://raw.githubusercontent.com/hyperpolymath/network-ambulance/main/install.sh | sudo bash
 ----
 
-== Safety guarantees
+=== Basic Usage
 
-Network Recovery Unit will never:
+==== Run Full Diagnostics
 
-* delete user data
-* “open ports” without explicit user consent
-* disable security controls silently
-* make undocumented permanent changes without a receipt
+[source,bash]
+----
+network-repair diagnose
+----
 
-Any mutating action must:
+This shows you *everything* about your network state: interfaces, DNS, routing, connectivity, firewall rules, NetworkManager status.
 
-* be represented as a plan first
-* declare required privileges
-* declare reversibility level
-* emit a receipt and evidence pointers
+Sample output:
 
-== Outputs
+[source,text]
+----
+[✓] Interface enp0s31f6: UP, no IP address (PROBLEM)
+[✓] Interface wlp3s0: UP, 10.45.253.69/24
+[✗] DNS: No working nameservers in /etc/resolv.conf
+[✓] Default route via 10.45.253.205
+[✗] Cannot reach 8.8.8.8 (PROBLEM)
+[✗] DNS resolution failing for google.com
+[!] WARNING: Multiple network managers detected (conflict)
+----
 
-Network Recovery Unit produces artifacts aligned with `system-tools-contracts`:
+==== Auto-Repair Everything
 
-* Evidence envelope references (diagnostics)
-* Procedure plan (steps, previews, risk labels)
-* Run bundle (standard folder layout)
-* Receipt (human + machine)
+If you trust Network Ambulance to fix everything it found:
 
-== Implementation approach (recommended)
+[source,bash]
+----
+sudo network-repair auto-repair
+----
 
-* Core: **D**
-  - robust CLI, orchestration, cross-distro detection
-* Optional: **Rust helpers**
-  - privileged, safety-critical execution paths (tight sandbox boundaries)
+==== Guided Repair (Recommended)
 
-Elixir/BEAM is excellent for coordination layers, but for Linux networking repair it is less suitable than D/Rust because the work is mostly system integration and privileged operations.
+For more control, use interactive mode:
 
-== Directory layout (proposed)
+[source,bash]
+----
+sudo network-repair repair --interactive
+----
 
-* `src/` — main CLI + orchestration
-* `modules/diagnostics/` — diagnostic checks
-* `modules/repairs/` — repair actions (plan/apply)
-* `schemas/` — local copies/links to relevant contracts
-* `examples/` — sample bundles and receipts
-* `docs/` — distro notes, safety notes, troubleshooting
+This walks you through each issue and asks what you want to do:
 
-== License
+[source,text]
+----
+Issue: No DNS servers configured in /etc/resolv.conf
 
-PMPL-1.0-or-later.
+Suggested repair: Add Google DNS (8.8.8.8, 8.8.4.4) to resolv.conf
+
+[Y] Apply this fix
+[S] Skip
+[D] Show details
+[Q] Quit
+
+Your choice:
+----
+
+==== Target Specific Problems
+
+Fix just DNS issues:
+
+[source,bash]
+----
+sudo network-repair repair dns
+----
+
+Fix just interface problems:
+
+[source,bash]
+----
+sudo network-repair repair interfaces
+----
+
+Other targets: `routing`, `networkmanager`, `firewall`
+
+==== Dry-Run Mode
+
+See what *would* be changed without actually changing it:
+
+[source,bash]
+----
+sudo network-repair repair --dry-run
+----
+
+Perfect for understanding what's wrong or verifying before production changes.
+
+== Real-World Scenarios
+
+=== Scenario 1: "WiFi Connected But No Internet"
+
+This is the most common problem—you're connected to WiFi, but browsers say "no internet".
+
+[source,bash]
+----
+$ network-repair diagnose connectivity
+
+[✓] Interface wlp3s0: UP, connected to "Home WiFi"
+[✗] Cannot ping 8.8.8.8
+[✗] Cannot resolve google.com
+[!] DNS server 192.168.1.1 unreachable
+
+$ sudo network-repair repair dns
+
+Creating backup of /etc/resolv.conf...
+Adding Google DNS (8.8.8.8)...
+Adding Cloudflare DNS (1.1.1.1)...
+Restarting systemd-resolved...
+Testing DNS resolution... SUCCESS
+
+[✓] DNS repaired. You should have internet now.
+----
+
+=== Scenario 2: "Ethernet Cable Plugged In, Not Working"
+
+Interface is down or misconfigured.
+
+[source,bash]
+----
+$ network-repair diagnose interfaces
+
+[✗] Interface enp0s31f6: DOWN (no carrier)
+[!] Cable may be disconnected or interface disabled
+
+$ sudo network-repair repair interfaces --target enp0s31f6
+
+Bringing up interface enp0s31f6...
+Renewing DHCP lease...
+Waiting for IP address... Got 192.168.1.105
+
+[✓] Interface enp0s31f6 is now UP with IP 192.168.1.105
+----
+
+=== Scenario 3: "VPN Broke Everything"
+
+VPN clients often mess up routing tables and DNS settings.
+
+[source,bash]
+----
+$ network-repair diagnose routing
+
+[✗] Multiple default routes detected (conflict)
+[✗] Default route points to unreachable gateway 10.8.0.1
+
+$ sudo network-repair repair routing
+
+Removing duplicate default route via 10.8.0.1...
+Adding default route via 192.168.1.1...
+Flushing route cache...
+
+[✓] Routing table repaired
+----
+
+=== Scenario 4: "Everything Was Fine Yesterday"
+
+Classic "I didn't change anything" scenario. Something updated and broke networking.
+
+[source,bash]
+----
+$ network-repair diagnose
+
+[!] NetworkManager and systemd-networkd are both active (CONFLICT)
+[✗] NetworkManager cannot manage wlp3s0 (blocked by systemd-networkd)
+
+$ sudo network-repair repair networkmanager
+
+Detected conflict: both NetworkManager and systemd-networkd active
+Recommended: Disable systemd-networkd, let NetworkManager handle interfaces
+
+Proceed? [y/N]: y
+
+Stopping systemd-networkd...
+Restarting NetworkManager...
+Reconnecting wlp3s0...
+
+[✓] Network conflict resolved
+----
+
+== Part of AmbientOps
+
+Network Ambulance is a *procedure pack* in the link:https://github.com/hyperpolymath/ambientops[AmbientOps ecosystem], which uses a "hospital model" for system tools:
+
+* **Ward** — Daily ambient system health ("System Weather")
+* **Emergency Room** — Panic-safe emergency diagnostics
+* **Operating Room** — Planned procedures (Network Ambulance lives here)
+* **Records** — Receipts, undo tokens, shareable help bundles
+
+Network Ambulance integrates with:
+
+* **Operating Theatre** for procedure orchestration
+* **Ward** for surfacing network health signals
+* **Emergency Room** for network emergencies (quick handoff)
+* **Records** for generating shareable incident bundles
+
+See `docs/AMBIENTOPS_INTEGRATION.adoc` for details.
+
+== Safety Guarantees
+
+Network Ambulance follows *AmbientOps safety principles*:
+
+=== ✓ Evidence-First, Not Fearware
+
+No "304 CRITICAL ERRORS DETECTED" scareware. Network Ambulance shows you *measurements*, not hype.
+
+Instead of: "Your network is 97% broken!"
+
+You get: "DNS server 192.168.1.1 unreachable. Google DNS reachable in 12ms. Suggestion: switch to Google DNS."
+
+=== ✓ Non-Destructive by Default
+
+Diagnostics are *completely read-only*. No changes without your approval.
+
+Repairs:
+
+* Create automatic timestamped backups
+* Prefer additive changes (add route, don't delete everything)
+* Avoid "nuke from orbit" approaches
+* Provide undo receipts
+
+=== ✓ Explicit Approval Required
+
+No silent changes. Every repair shows:
+
+* What it will do
+* Why it's needed
+* What can go wrong
+* How to undo it
+
+You approve each change (or use `--yes` if you're confident).
+
+=== ✓ Never Opens Security Holes
+
+Network Ambulance will **NEVER**:
+
+* Open firewall ports without explicit consent
+* Disable security controls silently
+* Weaken authentication
+* Delete user data
+* Make permanent changes without documentation
+
+=== ✓ Works Offline
+
+Network Ambulance doesn't require internet to diagnose or repair network problems (obviously).
+
+All diagnostics and most repairs work *completely offline*.
+
+== Command Reference
+
+[cols="2,3"]
+|===
+|Command |Description
+
+|`network-repair diagnose`
+|Run all diagnostics
+
+|`network-repair diagnose <target>`
+|Diagnose specific area (dns\|interfaces\|routing\|connectivity\|firewall\|networkmanager)
+
+|`sudo network-repair repair`
+|Interactive guided repair
+
+|`sudo network-repair repair <target>`
+|Repair specific area
+
+|`sudo network-repair auto-repair`
+|Automatically fix all detected issues
+
+|`sudo network-repair repair --dry-run`
+|Show what would be changed (no actual changes)
+
+|`network-repair status`
+|Quick network health check
+
+|`network-repair list-interfaces`
+|List all network interfaces
+
+|`network-repair test-dns`
+|Test DNS resolution
+
+|`network-repair test-connectivity`
+|Test internet connectivity
+
+|`network-repair version`
+|Show version info
+
+|`network-repair help`
+|Show help message
+|===
+
+=== Options
+
+[cols="1,3"]
+|===
+|Option |Description
+
+|`-v, --verbose`
+|Show detailed output
+
+|`-q, --quiet`
+|Minimal output
+
+|`-y, --yes`
+|Auto-approve all changes (dangerous!)
+
+|`--dry-run`
+|Preview changes only
+
+|`--no-color`
+|Disable colored output
+
+|`--log <file>`
+|Write log to file
+
+|`--backup-dir <dir>`
+|Custom backup directory
+
+|`--interactive`
+|Guided mode (ask before each change)
+|===
+
+== Advanced Features
+
+=== Export Incident Bundles
+
+Generate a shareable diagnostic bundle for forums/support:
+
+[source,bash]
+----
+network-repair export --bundle /tmp/network-issue
+----
+
+Creates:
+
+[source,text]
+----
+/tmp/network-issue/
+├── diagnostics.txt       # Full diagnostic output
+├── system-info.txt       # OS, kernel, hardware
+├── network-config/       # Config files (sanitized)
+│   ├── resolv.conf
+│   ├── NetworkManager.conf
+│   └── interfaces
+├── logs/                 # Relevant logs
+│   ├── networkmanager.log
+│   └── syslog-network.log
+└── metadata.json         # Machine-readable summary
+----
+
+The bundle *automatically sanitizes* sensitive info (passwords, IPs if requested).
+
+=== Backup Management
+
+List all backups:
+
+[source,bash]
+----
+network-repair list-backups
+----
+
+Restore from backup:
+
+[source,bash]
+----
+sudo network-repair restore --backup 2026-01-29_14-30-22
+----
+
+=== JSON Output
+
+For scripting/automation:
+
+[source,bash]
+----
+network-repair diagnose --format json
+----
+
+Returns structured JSON with all diagnostic results.
+
+=== Logging
+
+Enable file logging:
+
+[source,bash]
+----
+network-repair diagnose --log /var/log/network-repair.log
+----
+
+Or set default log location:
+
+[source,bash]
+----
+export NETWORK_REPAIR_LOG=/var/log/network-repair.log
+----
+
+== Distribution Support
+
+Network Ambulance works on:
+
+* ✓ Ubuntu / Debian (fully supported)
+* ✓ Fedora / RHEL / CentOS (fully supported)
+* ✓ Arch Linux (fully supported)
+* ✓ openSUSE (supported)
+* ⚠ Other systemd-based distros (best-effort)
+
+Network manager support:
+
+* ✓ NetworkManager (primary, fully supported)
+* ✓ systemd-networkd (supported)
+* ⚠ netplan (via NetworkManager/systemd-networkd)
+* ✗ ifupdown (legacy, limited support)
+
+== Technical Details
+
+=== Architecture
+
+[source,text]
+----
+network-repair
+├── src/main.sh              # CLI entry point
+├── src/diagnostics/         # Diagnostic modules
+│   ├── connectivity.sh
+│   ├── dns.sh
+│   ├── firewall.sh
+│   ├── interfaces.sh
+│   ├── networkmanager.sh
+│   └── routing.sh
+├── src/repairs/             # Repair modules
+│   ├── dns.sh
+│   ├── interfaces.sh
+│   ├── networkmanager.sh
+│   └── routing.sh
+└── src/utils/               # Core utilities
+    ├── backup.sh            # Backup/restore
+    ├── colors.sh            # Terminal colors
+    ├── logging.sh           # Logging framework
+    ├── privileges.sh        # Root/sudo handling
+    └── system.sh            # OS detection
+----
+
+=== Requirements
+
+* Bash 4.0+
+* Standard Linux utilities: `ip`, `ping`, `dig`, `curl`
+* NetworkManager or systemd-networkd (optional but recommended)
+* Root/sudo for repairs (diagnostics work without root)
+
+=== Implementation Language
+
+Network Ambulance v1.x is implemented in *Bash* for maximum portability and minimal dependencies.
+
+Future versions may use:
+
+* **D** for core orchestration (robust, cross-distro)
+* **Rust** for privileged operations (safety-critical paths)
+
+Per Rhodium Standard Repository (RSR) guidelines.
+
+== Why Network Ambulance?
+
+=== vs. Manual Forum Fixes
+
+|===
+|Manual Fixes |Network Ambulance
+
+|Search 10 forum threads
+|One command
+
+|Copy-paste random commands
+|Safe, tested procedures
+
+|Hope it works
+|Evidence-based diagnostics
+
+|No undo if it breaks
+|Automatic backups + undo
+
+|"Works on Ubuntu 16.04"
+|Works on modern distros
+
+|Might delete something important
+|Never deletes data
+|===
+
+=== vs. "Network Optimizer" Tools
+
+Those sketchy "Clean your network!" tools?
+
+* They lie about problems to scare you
+* They open security holes
+* They install adware/spyware
+* They want your credit card
+
+Network Ambulance:
+
+* ✓ Open source (review the code)
+* ✓ No telemetry, no tracking
+* ✓ No "premium upsells"
+* ✓ Evidence-based, no fake errors
+* ✓ Safety-first design
+
+=== vs. Learning Everything Yourself
+
+Learning networking is great, but when your deadline is in 2 hours and your internet is down, you don't have time for a CCNA course.
+
+Network Ambulance is *teaching-friendly*:
+
+* Explains what it finds in plain English
+* Shows the commands it runs
+* Documents why each fix works
+* References are included (learn at your own pace)
+
+You can learn while fixing, not instead of fixing.
 
 == Roadmap
 
-See `ROADMAP.adoc`.
+=== v1.1 (Q1 2026)
+
+* Wireless-specific diagnostics (signal strength, channel interference)
+* VPN detection and diagnostics
+* Improved conflict detection (multiple network managers)
+* Enhanced logging and reporting
+
+=== v1.2 (Q2 2026) 🎯 **Current Target**
+
+* Firewall repair module (safe UFW/firewalld configuration)
+* systemd-networkd advanced features
+* Plugin architecture (beta)
+* Test coverage >90%
+* Captive portal detection
+* Proxy configuration diagnostics
+
+See link:ROADMAP.adoc[ROADMAP.adoc] for the complete roadmap to v1.2 and beyond.
+
+== Contributing
+
+We welcome contributions! See link:CONTRIBUTING.adoc[CONTRIBUTING.adoc].
+
+Priority areas for v1.2:
+
+* Firewall repair safety checks
+* Captive portal detection
+* Proxy diagnostics
+* Test coverage improvements
+* Documentation for additional distros
+
+== Support
+
+* Issues: https://github.com/hyperpolymath/network-ambulance/issues
+* Discussions: https://github.com/hyperpolymath/network-ambulance/discussions
+* Security issues: See link:SECURITY.md[SECURITY.md]
+
+== License
+
+Network Ambulance is licensed under PMPL-1.0-or-later (Palimpsest Meta-Permissive License).
+
+See link:LICENSE[LICENSE] for details.
+
+== Philosophy
+
+Network Ambulance follows the link:https://github.com/hyperpolymath/palimpsest-license[Palimpsest philosophy]:
+
+* **Boring is good** — Reliable, predictable, no surprises
+* **Evidence over hype** — Show measurements, not marketing
+* **Safety-first** — Never break what's working
+* **Respect users** — No dark patterns, no manipulation
+* **Open by default** — Audit anything, trust nothing
+
+[quote]
+____
+"The best system tool is the one you never notice—until you desperately need it, and it just works."
+____
+
+---
+
+Made with care by the link:https://github.com/hyperpolymath[Hyperpolymath Project].
