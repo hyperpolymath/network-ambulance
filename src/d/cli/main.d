@@ -8,9 +8,12 @@ module cli.main;
 import std.stdio;
 import std.getopt;
 import std.conv;
+import std.format;
 import platform;
 import core.diagnostics.dns;
 import core.diagnostics.interfaces;
+import core.diagnostics.routing;
+import core.diagnostics.connectivity;
 
 /// CLI commands
 enum Command {
@@ -119,6 +122,87 @@ int runDiagnose(bool verbose) {
     if (dnsDiag.recommendations.length > 0) {
         writeln("\nRecommendations:");
         foreach (rec; dnsDiag.recommendations) {
+            writeln("  → ", rec);
+        }
+    }
+
+    writeln();
+
+    // Routing Diagnostics
+    writeln("=== Routing Diagnostics ===");
+    auto routeDiag = diagnoseRouting(platform);
+
+    if (routeDiag.hasDefaultRoute) {
+        writeln("✓ Default route configured: ", routeDiag.defaultRoutes.length);
+        foreach (route; routeDiag.defaultRoutes) {
+            writeln("  - via ", route.gateway, " dev ", route.interfaceName,
+                   " (metric: ", route.metric, ")");
+        }
+    } else {
+        writeln("✗ No default route configured");
+    }
+
+    if (routeDiag.canReachGateway) {
+        writeln("✓ Gateway ", routeDiag.gatewayIP, " is reachable");
+    } else if (routeDiag.gatewayIP.length > 0) {
+        writeln("✗ Cannot reach gateway ", routeDiag.gatewayIP);
+    }
+
+    if (verbose) {
+        writeln("\nAll routes:");
+        foreach (route; routeDiag.routes) {
+            writefln("  %s via %s dev %s (metric: %d)",
+                    route.destination, route.gateway, route.interfaceName, route.metric);
+        }
+    }
+
+    if (routeDiag.warnings.length > 0) {
+        writeln("\nWarnings:");
+        foreach (warning; routeDiag.warnings) {
+            writeln("  ⚠ ", warning);
+        }
+    }
+
+    if (routeDiag.recommendations.length > 0) {
+        writeln("\nRecommendations:");
+        foreach (rec; routeDiag.recommendations) {
+            writeln("  → ", rec);
+        }
+    }
+
+    writeln();
+
+    // Connectivity Diagnostics
+    writeln("=== Connectivity Diagnostics ===");
+    auto connDiag = diagnoseConnectivity(platform);
+
+    foreach (test; connDiag.tests) {
+        string status = test.reachable ? "✓" : "✗";
+        writefln("%s %s [%s, %.0fms]", status, test.target, test.protocol, test.latencyMs);
+    }
+
+    if (connDiag.hasInternet) {
+        writefln("\n✓ Internet connectivity: OK (avg latency: %.0fms)", connDiag.avgLatency);
+    } else {
+        writeln("\n✗ No internet connectivity");
+    }
+
+    if (connDiag.hasDNS) {
+        writeln("✓ DNS resolution: OK");
+    } else {
+        writeln("✗ DNS resolution: FAILED");
+    }
+
+    if (connDiag.warnings.length > 0) {
+        writeln("\nWarnings:");
+        foreach (warning; connDiag.warnings) {
+            writeln("  ⚠ ", warning);
+        }
+    }
+
+    if (connDiag.recommendations.length > 0) {
+        writeln("\nRecommendations:");
+        foreach (rec; connDiag.recommendations) {
             writeln("  → ", rec);
         }
     }
