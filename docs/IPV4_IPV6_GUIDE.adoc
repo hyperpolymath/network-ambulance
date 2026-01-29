@@ -1,0 +1,571 @@
+= IPv4/IPv6 Dual-Stack Networking Guide
+:toc:
+:toclevels: 3
+
+== Overview
+
+Network Ambulance provides comprehensive IPv4 and IPv6 diagnostics, covering:
+
+* Dual-stack configuration and preference
+* IPv6 addressing (link-local, ULA, global)
+* Transition mechanisms (6to4, Teredo, NAT64, DNS64)
+* Connectivity testing for both protocols
+* Common IPv4/IPv6 issues and fixes
+
+== IPv6 Address Types
+
+=== Link-Local Addresses (`fe80::/10`)
+
+**Purpose:** Automatically configured on all IPv6-enabled interfaces
+
+[source,console]
+----
+fe80::1234:5678:90ab:cdef/64  # Link-local on interface
+----
+
+**Characteristics:**
+* Not routable beyond local link
+* Used for neighbor discovery (NDP)
+* Always present on IPv6 interfaces
+* Essential for router advertisements
+
+**Problems:**
+* "Only link-local" means no internet connectivity
+* Router advertisements not reaching interface
+* DHCPv6 server unreachable
+
+=== Unique Local Addresses (`fc00::/7`)
+
+**Purpose:** Private IPv6 addresses (like RFC 1918 for IPv4)
+
+[source,console]
+----
+fd12:3456:789a:bcde::1/64     # ULA address
+----
+
+**Characteristics:**
+* `fc00::/8` - centrally assigned (not used)
+* `fd00::/8` - locally assigned (common)
+* Not routable on public internet
+* Used for internal networks
+
+**Use Cases:**
+* Internal network communication
+* VPNs and private networks
+* Backup connectivity if global fails
+
+=== Global Unicast Addresses (`2000::/3`)
+
+**Purpose:** Public IPv6 addresses for internet connectivity
+
+[source,console]
+----
+2001:db8:1234:5678::1/64      # Global unicast (example)
+----
+
+**Configuration Methods:**
+
+1. **SLAAC (Stateless Address Autoconfiguration)**
+   * Router advertisements provide prefix
+   * Interface ID from MAC or random
+   * No central server needed
+
+2. **DHCPv6 (Stateful)**
+   * DHCP server assigns address
+   * Requires DHCPv6 server on network
+   * Can provide DNS servers, NTP, etc.
+
+3. **Static Configuration**
+   * Manually configured addresses
+   * Used for servers, routers
+   * No automatic renumbering
+
+== IPv6 Privacy Extensions (RFC 4941)
+
+**Problem:** SLAAC addresses derived from MAC are trackable
+
+[source,console]
+----
+# Stable SLAAC address (predictable, trackable)
+2001:db8::224:d7ff:fe9a:bcde/64
+
+# Privacy extension address (randomized, temporary)
+2001:db8::1234:5678:90ab:cdef/64 (temporary, preferred)
+----
+
+**Behavior:**
+* System generates temporary addresses
+* Rotates periodically (typically daily)
+* Outgoing connections use temporary addresses
+* Incoming connections use stable address
+
+**Configuration:**
+
+[source,bash]
+----
+# Linux: Enable privacy extensions
+sysctl -w net.ipv6.conf.all.use_tempaddr=2
+
+# macOS: Enabled by default
+
+# Windows: Enabled by default
+----
+
+== Dual-Stack Configuration
+
+=== What is Dual-Stack?
+
+Running both IPv4 and IPv6 simultaneously:
+
+[source,console]
+----
+# IPv4 address
+192.168.1.100/24
+
+# IPv6 link-local
+fe80::1234:5678:90ab:cdef/64
+
+# IPv6 global
+2001:db8::1/64
+----
+
+=== Address Selection Policy (RFC 6724)
+
+Operating systems prefer IPv6 over IPv4 by default:
+
+[source,console]
+----
+# Priority order (higher = preferred)
+1. ::1/128           (IPv6 loopback)
+2. ::/0              (IPv6 default)
+3. ::ffff:0:0/96     (IPv4-mapped IPv6)
+4. ...
+----
+
+**Override on Linux:**
+
+[source,bash]
+----
+# Edit /etc/gai.conf to prefer IPv4
+precedence ::ffff:0:0/96  100
+----
+
+=== Happy Eyeballs (RFC 8305)
+
+Modern browsers/apps try both protocols simultaneously:
+
+1. Start IPv6 connection
+2. Wait 50-250ms
+3. Start IPv4 connection in parallel
+4. Use whichever connects first
+
+**Why it matters:**
+* Broken IPv6 causes 1-2 second delays without Happy Eyeballs
+* Modern systems implement this automatically
+* Older systems suffer from IPv6 connectivity issues
+
+== Common IPv6 Problems
+
+=== Problem: No IPv6 Default Route
+
+**Symptoms:**
+[source,console]
+----
+$ ip -6 route show
+fe80::/64 dev eth0 proto kernel metric 256
+# Missing: default via fe80::... dev eth0
+----
+
+**Causes:**
+* No router advertisements (RA) received
+* Router not configured for IPv6
+* Firewall blocking ICMPv6
+
+**Diagnosis:**
+[source,bash]
+----
+# Listen for router advertisements
+radvdump
+
+# Check if router sends RAs
+ping6 ff02::1%eth0   # Multicast to all nodes
+ping6 ff02::2%eth0   # Multicast to all routers
+----
+
+**Fix:**
+* Enable IPv6 on upstream router
+* Check firewall allows ICMPv6 type 134 (RA)
+* Manually configure default route (temporary):
+
+[source,bash]
+----
+ip -6 route add default via fe80::1 dev eth0
+----
+
+=== Problem: IPv6 Works, IPv4 Doesn't (or vice versa)
+
+**Symptoms:**
+* `ping 8.8.8.8` works but `ping6 2001:4860:4860::8888` fails
+* Or opposite: IPv6 works, IPv4 fails
+
+**Diagnosis:**
+[source,bash]
+----
+# Test both protocols
+ping -4 -c 3 google.com    # Force IPv4
+ping -6 -c 3 google.com    # Force IPv6
+
+# Check DNS returns both A and AAAA
+dig google.com A           # IPv4 records
+dig google.com AAAA        # IPv6 records
+----
+
+**Common Causes:**
+* DNS server only returns one record type
+* Firewall blocks one protocol
+* ISP doesn't support one protocol
+* Routing issue for one protocol
+
+=== Problem: Teredo/6to4 Tunnel Active (Suboptimal)
+
+**Symptoms:**
+[source,console]
+----
+# Teredo address detected
+2001:0:1234:5678::1/32
+
+# Or 6to4 address
+2002:c000:0201::1/16    # Derived from IPv4 192.0.2.1
+----
+
+**Why it's bad:**
+* High latency (tunneling overhead)
+* Unreliable (depends on relay servers)
+* Security concerns (unmanaged tunnels)
+* 6to4 is deprecated (RFC 7526)
+
+**Fix:**
+[source,bash]
+----
+# Linux: Disable Teredo
+modprobe -r ipv6
+modprobe ipv6 disable_ipv6=0
+
+# Windows: Disable Teredo
+netsh interface teredo set state disabled
+
+# Request native IPv6 from ISP instead
+----
+
+=== Problem: MTU Issues with IPv6
+
+**Symptoms:**
+* Small packets work, large packets fail
+* HTTPS works, large file downloads fail
+* SSH works, scp fails
+
+**Cause:** IPv6 requires 1280 byte MTU minimum, but tunnels reduce this
+
+**Diagnosis:**
+[source,bash]
+----
+# Test with different packet sizes
+ping6 -s 1232 -M do 2001:4860:4860::8888  # Should work
+ping6 -s 1452 -M do 2001:4860:4860::8888  # May fail
+
+# Check interface MTU
+ip link show eth0
+----
+
+**Fix:**
+[source,bash]
+----
+# Reduce MTU if using tunnel
+ip link set dev eth0 mtu 1280
+
+# Or enable Path MTU Discovery
+sysctl -w net.ipv6.conf.all.mtu=1280
+----
+
+== IPv4 Specific Issues
+
+=== Carrier-Grade NAT (CGNAT) Detection
+
+**What is CGNAT:**
+ISPs use NAT to share IPv4 addresses among multiple customers.
+
+**Detection:**
+[source,bash]
+----
+# Check if your "public" IP is actually private
+curl -4 ifconfig.me
+
+# If result is in these ranges, you're behind CGNAT:
+# 100.64.0.0/10   (RFC 6598 - CGNAT range)
+# 10.0.0.0/8      (Private)
+# 172.16.0.0/12   (Private)
+# 192.168.0.0/16  (Private)
+----
+
+**Problems with CGNAT:**
+* Port forwarding doesn't work
+* Incoming connections impossible
+* VPN may not work
+* Multiple customers share same IP
+
+**Solutions:**
+* Request public IPv4 (may cost extra)
+* Use IPv6 instead (no NAT needed)
+* Use VPN with port forwarding
+* Use reverse proxy (ngrok, cloudflare tunnel)
+
+=== IPv4 Exhaustion
+
+Global IPv4 addresses are exhausted. Options:
+
+1. **Use IPv6** - Unlimited addresses, modern protocol
+2. **CGNAT** - Share IPv4 with others (limited functionality)
+3. **Pay for dedicated IPv4** - May cost $2-5/month extra
+
+== Transition Mechanisms
+
+=== 6to4 (DEPRECATED - DO NOT USE)
+
+[source,console]
+----
+2002:c000:0201::/48   # Automatically from IPv4 192.0.2.1
+----
+
+**Status:** Deprecated by RFC 7526
+**Problems:**
+* Relies on anyone relay servers (security risk)
+* No way to guarantee relay availability
+* Poor performance
+
+**Action:** Disable 6to4, use native IPv6 or modern tunnel
+
+=== Teredo (Windows Default)
+
+[source,console]
+----
+2001:0:4137:9e76:1234:5678:90ab:cdef/32
+----
+
+**Purpose:** IPv6 through NAT for Windows
+**Problems:**
+* High latency (Microsoft relay servers)
+* Only works through UDP
+* Security concerns
+
+**When to use:** Last resort if no native IPv6
+
+=== NAT64 + DNS64
+
+**Purpose:** Allow IPv6-only clients to reach IPv4 servers
+
+**How it works:**
+1. Client queries AAAA record for `ipv4only.example.com`
+2. DNS64 server synthesizes AAAA from A record
+3. Returns `64:ff9b::192.0.2.1` (NAT64 prefix + IPv4)
+4. Client connects to NAT64 gateway
+5. Gateway translates to IPv4
+
+**Detection:**
+[source,bash]
+----
+# Query DNS64 server
+dig @dns64-server AAAA ipv4only.arpa
+
+# If returns 64:ff9b::192.0.2.1, NAT64 is active
+----
+
+=== 464XLAT (Mobile Networks)
+
+**Purpose:** IPv4 apps on IPv6-only mobile networks
+
+**Components:**
+* CLAT (Customer-side translator) - on phone
+* PLAT (Provider-side translator) - in network
+
+**Detection:** Check for `192.0.0.0/29` addresses on mobile
+
+== Network Ambulance IPv6 Diagnostics
+
+=== Running IPv6 Diagnostics
+
+[source,bash]
+----
+# Full diagnostics (includes IPv6)
+./bin/network-ambulance-d diagnose
+
+# JSON output for scripting
+./bin/network-ambulance-d diagnose --json | jq '.ipv6'
+----
+
+=== What Gets Checked
+
+1. **Address Configuration**
+   * Link-local addresses
+   * Global unicast addresses
+   * ULA addresses
+   * Privacy extensions active
+
+2. **Routing**
+   * Default IPv6 route present
+   * Gateway reachability
+   * Router advertisement reception
+
+3. **Connectivity**
+   * Ping to `2001:4860:4860::8888` (Google DNS)
+   * Ping to `2606:4700:4700::1111` (Cloudflare DNS)
+   * DNS AAAA record resolution
+
+4. **Transition Mechanisms**
+   * Teredo tunnel detection
+   * 6to4 detection
+   * NAT64/DNS64 detection
+
+5. **Dual-Stack**
+   * Both protocols enabled
+   * Address selection preference
+   * Happy Eyeballs support
+
+=== Example Output
+
+[source,console]
+----
+=== IPv6 Diagnostics ===
+✓ Link-local address: fe80::1234:5678:90ab:cdef/64
+✓ Global address: 2001:db8::1/64
+✓ Privacy extensions: Enabled
+✓ Default route: via fe80::1 dev eth0
+✓ IPv6 connectivity: OK (15ms avg latency)
+✓ DNS AAAA resolution: Working
+
+Dual-Stack: Enabled
+  IPv6 preferred: Yes
+  Happy Eyeballs: Supported
+
+⚠ Warning: Teredo tunnel detected
+  → Disable Teredo, use native IPv6 from ISP
+----
+
+== Troubleshooting Workflow
+
+=== Step 1: Check IPv6 is Enabled
+
+[source,bash]
+----
+# Linux
+sysctl net.ipv6.conf.all.disable_ipv6
+# Should be 0 (enabled)
+
+# Check for IPv6 addresses
+ip -6 addr show
+
+# Should see at least link-local (fe80::)
+----
+
+=== Step 2: Check Router Advertisements
+
+[source,bash]
+----
+# Capture RAs
+tcpdump -i eth0 'icmp6 and ip6[40] == 134'
+
+# Or use radvdump
+radvdump -i eth0
+----
+
+=== Step 3: Test Basic Connectivity
+
+[source,bash]
+----
+# Ping link-local gateway
+ping6 -c 3 fe80::1%eth0
+
+# Ping global IPv6
+ping6 -c 3 2001:4860:4860::8888
+
+# Test DNS
+dig @2001:4860:4860::8888 google.com AAAA
+----
+
+=== Step 4: Check Firewall
+
+[source,bash]
+----
+# Allow ICMPv6 (ESSENTIAL for IPv6)
+ip6tables -A INPUT -p icmpv6 -j ACCEPT
+ip6tables -A OUTPUT -p icmpv6 -j ACCEPT
+
+# Check current rules
+ip6tables -L -v -n
+----
+
+=== Step 5: Verify Dual-Stack
+
+[source,bash]
+----
+# Test both protocols to same destination
+curl -4 https://ipv6.google.com  # Should work via IPv4
+curl -6 https://ipv6.google.com  # Should work via IPv6
+----
+
+== Best Practices
+
+=== Enable IPv6 Everywhere
+
+* Modern internet is dual-stack
+* IPv6-only networks are coming (mobile already)
+* Better performance (no NAT overhead)
+
+=== Use Privacy Extensions
+
+[source,bash]
+----
+# Linux
+net.ipv6.conf.all.use_tempaddr = 2
+net.ipv6.conf.default.use_tempaddr = 2
+----
+
+=== Allow ICMPv6 in Firewall
+
+**CRITICAL:** IPv6 requires ICMPv6 for:
+* Neighbor Discovery (replaces ARP)
+* Router Advertisements
+* Path MTU Discovery
+* Multicast Listener Discovery
+
+**Never block ICMPv6 types:**
+* Type 1 - Destination Unreachable
+* Type 2 - Packet Too Big
+* Type 133 - Router Solicitation
+* Type 134 - Router Advertisement
+* Type 135 - Neighbor Solicitation
+* Type 136 - Neighbor Advertisement
+
+=== Prefer Native IPv6 Over Tunnels
+
+Priority (best to worst):
+1. Native IPv6 from ISP
+2. Tunnel broker (Hurricane Electric, etc.)
+3. Teredo (last resort)
+4. 6to4 (deprecated, avoid)
+
+=== Monitor Both Protocols
+
+Use Network Ambulance to continuously monitor:
+[source,bash]
+----
+# Run diagnostics hourly
+0 * * * * /usr/local/bin/network-ambulance-d diagnose --json > /var/log/net-status.json
+----
+
+== References
+
+* RFC 4291 - IPv6 Addressing Architecture
+* RFC 4941 - Privacy Extensions for SLAAC
+* RFC 6724 - Default Address Selection
+* RFC 8305 - Happy Eyeballs v2
+* RFC 7526 - Deprecating 6to4

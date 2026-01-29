@@ -1,0 +1,570 @@
+= IPv4/IPv6 Monitoring and Alerting Guide
+:toc:
+:toclevels: 2
+
+== Overview
+
+Continuous monitoring of dual-stack networks helps detect:
+
+* IPv6 deployment regressions
+* Transition mechanism failures
+* Dual-stack preference issues
+* Connectivity degradation
+* MTU problems
+* Privacy extension failures
+
+== Monitoring Metrics
+
+=== Critical Metrics
+
+[cols="1,2,1"]
+|===
+|Metric |Description |Alert Threshold
+
+|IPv6 Global Address Present
+|At least one global unicast address configured
+|< 1 address (if IPv6 expected)
+
+|IPv6 Default Route
+|Default route via IPv6 gateway exists
+|Missing route
+
+|IPv6 Connectivity
+|Can reach IPv6 internet (ping 2001:4860:4860::8888)
+|> 5% packet loss
+
+|IPv6 DNS Resolution
+|Can resolve AAAA records
+|Failure rate > 1%
+
+|IPv6 Latency
+|Round-trip time to IPv6 destinations
+|> 200ms or 2x IPv4 latency
+
+|Dual-Stack Balance
+|Traffic split between IPv4/IPv6
+|> 90% on one protocol
+
+|Privacy Extensions
+|Temporary addresses active
+|No temporary addr for > 24h
+|===
+
+=== Warning Metrics
+
+[cols="1,2,1"]
+|===
+|Metric |Description |Alert Threshold
+
+|Teredo Active
+|Using Teredo tunneling
+|Present (suboptimal)
+
+|6to4 Active
+|Using deprecated 6to4
+|Present (deprecated)
+
+|Only Link-Local
+|No global IPv6 address
+|> 5 minutes
+
+|MTU Issues
+|Path MTU < 1280
+|< 1280 bytes
+
+|RA Interval
+|Time between router advertisements
+|> 600 seconds
+
+|Deprecated Addresses
+|Addresses in deprecated state
+|> 2 deprecated addrs
+|===
+
+== Monitoring Methods
+
+=== Continuous Monitoring Script
+
+[source,bash]
+----
+#!/bin/bash
+# IPv6 monitoring script
+
+LOG_FILE="/var/log/ipv6-monitor.log"
+ALERT_EMAIL="admin@example.com"
+
+check_ipv6() {
+    local status="OK"
+    local issues=""
+
+    # Check global address
+    if ! ip -6 addr show scope global | grep -q "inet6"; then
+        status="CRITICAL"
+        issues+="No global IPv6 address\n"
+    fi
+
+    # Check default route
+    if ! ip -6 route show default | grep -q "via"; then
+        status="CRITICAL"
+        issues+="No IPv6 default route\n"
+    fi
+
+    # Check connectivity
+    if ! ping6 -c 3 -W 2 2001:4860:4860::8888 &>/dev/null; then
+        status="CRITICAL"
+        issues+="IPv6 connectivity failed\n"
+    fi
+
+    # Check DNS
+    if ! dig +short @2001:4860:4860::8888 google.com AAAA &>/dev/null; then
+        status="WARNING"
+        issues+="IPv6 DNS resolution failed\n"
+    fi
+
+    # Check for Teredo
+    if ip -6 addr | grep -q "2001:0:"; then
+        status="WARNING"
+        issues+="Teredo tunnel active (suboptimal)\n"
+    fi
+
+    # Check privacy extensions
+    if ! ip -6 addr show scope global | grep -q "temporary"; then
+        status="WARNING"
+        issues+="No privacy extensions active\n"
+    fi
+
+    # Log results
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Status: $status" >> "$LOG_FILE"
+    if [ -n "$issues" ]; then
+        echo -e "$issues" >> "$LOG_FILE"
+
+        # Send alert if critical
+        if [ "$status" = "CRITICAL" ]; then
+            echo -e "IPv6 CRITICAL ISSUES:\n$issues" | \
+                mail -s "IPv6 Alert: $status" "$ALERT_EMAIL"
+        fi
+    fi
+}
+
+# Run check
+check_ipv6
+----
+
+=== Systemd Timer for Monitoring
+
+[source,ini]
+----
+# /etc/systemd/system/ipv6-monitor.service
+[Unit]
+Description=IPv6 Network Monitoring
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/network-ambulance-d diagnose --json
+StandardOutput=append:/var/log/ipv6-monitor.json
+----
+
+[source,ini]
+----
+# /etc/systemd/system/ipv6-monitor.timer
+[Unit]
+Description=IPv6 Monitoring Timer
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+----
+
+Enable:
+[source,bash]
+----
+systemctl enable --now ipv6-monitor.timer
+----
+
+=== Prometheus Metrics
+
+Export metrics for Prometheus/Grafana:
+
+[source,bash]
+----
+#!/bin/bash
+# IPv6 metrics exporter
+
+cat > /var/lib/node_exporter/ipv6.prom <<EOF
+# HELP ipv6_has_global_address IPv6 global address present (1=yes, 0=no)
+# TYPE ipv6_has_global_address gauge
+ipv6_has_global_address $(ip -6 addr show scope global | grep -q "inet6" && echo 1 || echo 0)
+
+# HELP ipv6_has_default_route IPv6 default route present (1=yes, 0=no)
+# TYPE ipv6_has_default_route gauge
+ipv6_has_default_route $(ip -6 route show default | grep -q "via" && echo 1 || echo 0)
+
+# HELP ipv6_connectivity IPv6 internet connectivity (1=up, 0=down)
+# TYPE ipv6_connectivity gauge
+ipv6_connectivity $(ping6 -c 1 -W 2 2001:4860:4860::8888 &>/dev/null && echo 1 || echo 0)
+
+# HELP ipv6_latency_ms IPv6 latency in milliseconds
+# TYPE ipv6_latency_ms gauge
+ipv6_latency_ms $(ping6 -c 3 -W 2 2001:4860:4860::8888 2>/dev/null | \
+    grep rtt | awk -F'/' '{print $5}')
+
+# HELP ipv6_has_privacy_extensions Privacy extensions active (1=yes, 0=no)
+# TYPE ipv6_has_privacy_extensions gauge
+ipv6_has_privacy_extensions $(ip -6 addr show scope global | grep -q "temporary" && echo 1 || echo 0)
+
+# HELP ipv6_teredo_active Teredo tunnel active (1=yes, 0=no)
+# TYPE ipv6_teredo_active gauge
+ipv6_teredo_active $(ip -6 addr | grep -q "2001:0:" && echo 1 || echo 0)
+EOF
+----
+
+Add to cron:
+[source,bash]
+----
+* * * * * /usr/local/bin/ipv6-metrics-exporter.sh
+----
+
+=== Network Ambulance JSON Monitoring
+
+[source,bash]
+----
+#!/bin/bash
+# Parse Network Ambulance JSON output
+
+RESULT=$(network-ambulance-d diagnose --json)
+
+# Extract IPv6 status
+HAS_GLOBAL=$(echo "$RESULT" | jq -r '.ipv6.has_global')
+HAS_ROUTE=$(echo "$RESULT" | jq -r '.ipv6.has_default_route')
+CONNECTIVITY=$(echo "$RESULT" | jq -r '.ipv6.can_reach_internet')
+
+# Alert if critical
+if [ "$HAS_GLOBAL" = "false" ] || [ "$CONNECTIVITY" = "false" ]; then
+    echo "CRITICAL: IPv6 failure detected" | \
+        mail -s "IPv6 Alert" admin@example.com
+fi
+----
+
+== Alerting Rules
+
+=== Critical Alerts (Immediate Response)
+
+[source,yaml]
+----
+# Prometheus alert rules
+groups:
+  - name: ipv6_critical
+    interval: 60s
+    rules:
+      - alert: IPv6ConnectivityLost
+        expr: ipv6_connectivity == 0
+        for: 5m
+        annotations:
+          summary: "IPv6 internet connectivity lost"
+          description: "Cannot reach IPv6 internet for 5 minutes"
+
+      - alert: IPv6NoGlobalAddress
+        expr: ipv6_has_global_address == 0
+        for: 10m
+        annotations:
+          summary: "No IPv6 global address configured"
+          description: "System has no global IPv6 address for 10 minutes"
+
+      - alert: IPv6HighLatency
+        expr: ipv6_latency_ms > 200
+        for: 15m
+        annotations:
+          summary: "IPv6 latency too high"
+          description: "IPv6 latency > 200ms for 15 minutes"
+----
+
+=== Warning Alerts (Monitor)
+
+[source,yaml]
+----
+  - name: ipv6_warnings
+    interval: 300s
+    rules:
+      - alert: IPv6TeredoActive
+        expr: ipv6_teredo_active == 1
+        for: 1h
+        annotations:
+          summary: "Teredo tunnel active (suboptimal)"
+          description: "Switch to native IPv6 for better performance"
+
+      - alert: IPv6NoPrivacyExtensions
+        expr: ipv6_has_privacy_extensions == 0
+        for: 1d
+        annotations:
+          summary: "IPv6 privacy extensions disabled"
+          description: "Enable privacy extensions for better privacy"
+----
+
+== Common Monitoring Patterns
+
+=== Detect IPv6 Regression
+
+**Pattern:** IPv6 worked, then stopped
+
+[source,bash]
+----
+# Compare current state with baseline
+BASELINE="/var/lib/ipv6-baseline.json"
+CURRENT=$(network-ambulance-d diagnose --json)
+
+if ! diff <(jq -S '.ipv6' "$BASELINE") <(echo "$CURRENT" | jq -S '.ipv6'); then
+    echo "IPv6 configuration changed!"
+    # Send alert
+fi
+----
+
+=== Detect Dual-Stack Imbalance
+
+**Pattern:** All traffic on IPv4, none on IPv6 (or vice versa)
+
+[source,bash]
+----
+# Check traffic distribution
+IPV4_BYTES=$(ip -s link show eth0 | grep "RX:" -A 1 | tail -1 | awk '{print $1}')
+IPV6_BYTES=$(ip -6 -s route show default | awk '{print $1}')
+
+# Alert if imbalance > 90%
+TOTAL=$((IPV4_BYTES + IPV6_BYTES))
+IPV6_PERCENT=$((IPV6_BYTES * 100 / TOTAL))
+
+if [ "$IPV6_PERCENT" -lt 10 ]; then
+    echo "WARNING: < 10% IPv6 traffic (dual-stack imbalance)"
+fi
+----
+
+=== Detect MTU Issues
+
+**Pattern:** Small packets work, large packets fail
+
+[source,bash]
+----
+# Test various packet sizes
+for size in 1232 1280 1400 1452; do
+    if ping6 -c 1 -s $size -M do 2001:4860:4860::8888 &>/dev/null; then
+        echo "Size $size: OK"
+    else
+        echo "Size $size: FAIL (MTU issue)"
+        break
+    fi
+done
+----
+
+=== Detect RA Failures
+
+**Pattern:** Router advertisements stop arriving
+
+[source,bash]
+----
+# Monitor RA interval
+LAST_RA=$(tcpdump -c 1 -i eth0 'icmp6 and ip6[40] == 134' 2>/dev/null | \
+    awk '{print $1}')
+
+# Alert if > 10 minutes since last RA
+# (normal RA interval is 200-600 seconds)
+----
+
+== Dashboards
+
+=== Grafana Dashboard Layout
+
+**Panel 1: IPv6 Status Overview**
+- Global address present (green/red)
+- Default route present (green/red)
+- Connectivity working (green/red)
+- DNS resolution working (green/red)
+
+**Panel 2: Latency Comparison**
+- IPv4 latency (line graph)
+- IPv6 latency (line graph)
+- Delta between protocols
+
+**Panel 3: Traffic Distribution**
+- IPv4 bytes (pie chart)
+- IPv6 bytes (pie chart)
+
+**Panel 4: Address Types**
+- Link-local addresses (count)
+- ULA addresses (count)
+- Global addresses (count)
+- Temporary addresses (count)
+
+**Panel 5: Issues Timeline**
+- Transition mechanisms active
+- Privacy extensions status
+- MTU issues
+- RA failures
+
+=== Example Grafana Query
+
+[source,promql]
+----
+# IPv6 availability over time
+avg_over_time(ipv6_connectivity[5m])
+
+# IPv6 vs IPv4 latency comparison
+ipv6_latency_ms / ipv4_latency_ms
+
+# Dual-stack traffic distribution
+sum(rate(ipv6_bytes_total[5m])) /
+  (sum(rate(ipv4_bytes_total[5m])) + sum(rate(ipv6_bytes_total[5m])))
+----
+
+== Automated Remediation
+
+=== Auto-Repair Script
+
+[source,bash]
+----
+#!/bin/bash
+# Automatic IPv6 repair
+
+ISSUE=$(network-ambulance-d diagnose --json | jq -r '.ipv6.warnings[0]')
+
+case "$ISSUE" in
+    "No IPv6 default route")
+        # Restart network to trigger RA
+        systemctl restart NetworkManager
+        ;;
+
+    "No privacy extensions")
+        # Enable privacy extensions
+        sysctl -w net.ipv6.conf.all.use_tempaddr=2
+        ;;
+
+    "Teredo tunnel active")
+        # Disable Teredo
+        modprobe -r ipv6
+        modprobe ipv6
+        ;;
+
+    *)
+        # Log for manual intervention
+        logger "IPv6 issue requires manual fix: $ISSUE"
+        ;;
+esac
+----
+
+=== Restart Network Interfaces
+
+[source,bash]
+----
+# Safe network restart (tries to preserve connectivity)
+restart_ipv6() {
+    # Record current state
+    ip -6 addr show > /tmp/ipv6-state-before.txt
+
+    # Restart
+    systemctl restart NetworkManager
+
+    # Wait for RA
+    sleep 10
+
+    # Verify improvement
+    if ping6 -c 1 2001:4860:4860::8888 &>/dev/null; then
+        logger "IPv6 restart successful"
+    else
+        logger "IPv6 restart failed, manual intervention needed"
+    fi
+}
+----
+
+== Log Analysis
+
+=== Useful Log Patterns
+
+[source,bash]
+----
+# Check NetworkManager logs for IPv6 issues
+journalctl -u NetworkManager | grep -i ipv6
+
+# Check for RA reception
+journalctl -u NetworkManager | grep "router advertisement"
+
+# Check for DHCPv6 activity
+journalctl | grep dhcp6
+
+# Check kernel IPv6 messages
+dmesg | grep -i ipv6
+----
+
+=== Parse Network Ambulance Logs
+
+[source,bash]
+----
+# Extract IPv6 connectivity history
+jq '.ipv6.can_reach_internet' /var/log/ipv6-monitor.json | \
+    awk '{sum+=$1; count++} END {print sum/count*100 "%"}'
+
+# Find when IPv6 broke
+jq -r 'select(.ipv6.can_reach_internet == false) | .timestamp' \
+    /var/log/ipv6-monitor.json | head -1
+----
+
+== Reporting
+
+=== Daily IPv6 Health Report
+
+[source,bash]
+----
+#!/bin/bash
+# Daily IPv6 health email
+
+{
+    echo "IPv6 Network Health Report"
+    echo "=========================="
+    echo ""
+
+    # Current status
+    echo "Current Status:"
+    network-ambulance-d diagnose | grep -A 20 "IPv6 Diagnostics"
+
+    echo ""
+    echo "24-Hour Statistics:"
+
+    # Connectivity uptime
+    UPTIME=$(jq -r '.ipv6.can_reach_internet' \
+        /var/log/ipv6-monitor.json | \
+        awk '{sum+=$1} END {print sum/NR*100}')
+    echo "  Connectivity uptime: $UPTIME%"
+
+    # Average latency
+    AVG_LATENCY=$(jq -r '.ipv6.latency_ms' \
+        /var/log/ipv6-monitor.json | \
+        awk '{sum+=$1; count++} END {print sum/count}')
+    echo "  Average latency: ${AVG_LATENCY}ms"
+
+    # Issues detected
+    echo ""
+    echo "Issues Detected:"
+    jq -r '.ipv6.warnings[]' /var/log/ipv6-monitor.json | \
+        sort | uniq -c | sort -rn
+
+} | mail -s "IPv6 Daily Report" admin@example.com
+----
+
+== Best Practices for Monitoring
+
+1. **Monitor Both Protocols:** Don't assume IPv4 working means IPv6 works
+2. **Test Real Destinations:** Use actual services, not just test servers
+3. **Check Privacy Extensions:** Ensure temporary addresses rotate
+4. **Alert on Regressions:** IPv6 stopping is as bad as never having it
+5. **Monitor Latency Ratio:** IPv6 should be ≤ 1.2x IPv4 latency
+6. **Detect Transition Mechanisms:** Tunnels indicate suboptimal deployment
+7. **Verify DNS Returns AAAA:** Ensure dual-stack DNS works
+8. **Check Happy Eyeballs:** Fast fallback prevents user-visible delays
+
+== References
+
+* RFC 7552 - IPv6 Monitoring Requirements
+* RIPE Network Monitoring Best Practices
+* M-Lab IPv6 Measurement Tools
