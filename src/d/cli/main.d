@@ -14,13 +14,23 @@ import core.diagnostics.dns;
 import core.diagnostics.interfaces;
 import core.diagnostics.routing;
 import core.diagnostics.connectivity;
+import core.repairs.dns_repair;
 
 /// CLI commands
 enum Command {
     Diagnose,
+    Repair,
     Status,
     Version,
     Help
+}
+
+/// Repair targets
+enum RepairTarget {
+    DNS,
+    Interface,
+    Routing,
+    All
 }
 
 /// Main entry point
@@ -46,6 +56,9 @@ int main(string[] args) {
             case "diagnose":
                 command = Command.Diagnose;
                 break;
+            case "repair":
+                command = Command.Repair;
+                break;
             case "status":
                 command = Command.Status;
                 break;
@@ -65,6 +78,14 @@ int main(string[] args) {
         final switch (command) {
             case Command.Diagnose:
                 return runDiagnose(verbose);
+            case Command.Repair:
+                // Parse repair target
+                if (args.length < 3) {
+                    writeln("Error: repair command requires a target");
+                    writeln("Usage: network-ambulance-d repair <dns|interface|routing|all>");
+                    return 1;
+                }
+                return runRepair(args[2], verbose);
             case Command.Status:
                 return runStatus();
             case Command.Version:
@@ -271,6 +292,91 @@ int runVersion() {
     return 0;
 }
 
+/// Run repair procedure
+int runRepair(string target, bool verbose) {
+    version(Posix) {
+        import core.sys.posix.unistd : getuid;
+    }
+
+    // Check for root privileges
+    version(Posix) {
+        if (getuid() != 0) {
+            writeln("Error: Repair operations require root privileges");
+            writeln("Please run with sudo: sudo network-ambulance-d repair ", target);
+            return 1;
+        }
+    }
+
+    auto platform = getPlatform();
+    RepairTarget repairTarget;
+
+    // Parse repair target
+    switch (target) {
+        case "dns":
+            repairTarget = RepairTarget.DNS;
+            break;
+        case "interface":
+            repairTarget = RepairTarget.Interface;
+            break;
+        case "routing":
+            repairTarget = RepairTarget.Routing;
+            break;
+        case "all":
+            repairTarget = RepairTarget.All;
+            break;
+        default:
+            writeln("Unknown repair target: ", target);
+            writeln("Valid targets: dns, interface, routing, all");
+            return 1;
+    }
+
+    writeln("Network Ambulance - Repair Mode");
+    writeln("================================\n");
+
+    bool anyRepaired = false;
+
+    // DNS repair
+    if (repairTarget == RepairTarget.DNS || repairTarget == RepairTarget.All) {
+        writeln("=== DNS Repair ===");
+
+        auto dnsDiag = diagnoseDNS(platform);
+        auto dnsResult = repairDNS(platform, dnsDiag);
+
+        if (dnsResult.backupCreated) {
+            writeln("✓ Backup created: ", dnsResult.backupPath);
+        }
+
+        foreach (action; dnsResult.actions) {
+            writeln("  ", action);
+        }
+
+        foreach (error; dnsResult.errors) {
+            writeln("  ✗ ", error);
+        }
+
+        if (dnsResult.success) {
+            writeln("✓ DNS repair completed successfully\n");
+            anyRepaired = true;
+        } else {
+            writeln("✗ DNS repair failed\n");
+        }
+    }
+
+    // Interface repair (placeholder)
+    if (repairTarget == RepairTarget.Interface || repairTarget == RepairTarget.All) {
+        writeln("=== Interface Repair ===");
+        writeln("  Interface repair not yet implemented\n");
+    }
+
+    // Routing repair (placeholder)
+    if (repairTarget == RepairTarget.Routing || repairTarget == RepairTarget.All) {
+        writeln("=== Routing Repair ===");
+        writeln("  Routing repair not yet implemented\n");
+    }
+
+    return anyRepaired ? 0 : 1;
+}
+
 /// Print help
 void printHelp() {
     writeln("Network Ambulance - D lang implementation");
@@ -279,9 +385,16 @@ void printHelp() {
     writeln();
     writeln("Commands:");
     writeln("  diagnose      Run full network diagnostics");
+    writeln("  repair        Repair network issues (requires sudo)");
     writeln("  status        Quick connectivity status");
     writeln("  version       Show version information");
     writeln("  help          Show this help");
+    writeln();
+    writeln("Repair Targets:");
+    writeln("  dns           Fix DNS configuration");
+    writeln("  interface     Fix network interface issues");
+    writeln("  routing       Fix routing table issues");
+    writeln("  all           Repair all detected issues");
     writeln();
     writeln("Options:");
     writeln("  -v, --verbose    Verbose output");
@@ -290,5 +403,7 @@ void printHelp() {
     writeln("Examples:");
     writeln("  network-ambulance-d diagnose");
     writeln("  network-ambulance-d diagnose --verbose");
+    writeln("  sudo network-ambulance-d repair dns");
+    writeln("  sudo network-ambulance-d repair all");
     writeln("  network-ambulance-d status");
 }
