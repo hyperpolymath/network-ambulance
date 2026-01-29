@@ -1,0 +1,428 @@
+= IPv4/IPv6 Quick Reference & Troubleshooting Cheat Sheet
+:toc:
+
+== IPv6 Address Recognition
+
+[cols="2,2,3"]
+|===
+|Prefix |Type |Meaning
+
+|`fe80::/10`
+|Link-Local
+|Local segment only, auto-configured, always present
+
+|`fc00::/7` (fd00::/8)
+|Unique Local (ULA)
+|Private IPv6, like 192.168.x.x for IPv4
+
+|`2000::/3`
+|Global Unicast
+|Public internet addresses
+
+|`ff00::/8`
+|Multicast
+|One-to-many communication
+
+|`::1/128`
+|Loopback
+|Localhost (like 127.0.0.1)
+
+|`2001::/32`
+|Teredo
+|Tunnel through NAT (Windows)
+
+|`2002::/16`
+|6to4
+|DEPRECATED - automatic tunnel
+
+|`2001:db8::/32`
+|Documentation
+|Example addresses (not routable)
+
+|`::ffff:0:0/96`
+|IPv4-Mapped
+|IPv4 represented as IPv6
+|===
+
+== One-Line Diagnostics
+
+[source,bash]
+----
+# Check IPv6 enabled
+sysctl net.ipv6.conf.all.disable_ipv6  # 0 = enabled
+
+# List all IPv6 addresses
+ip -6 addr show scope global
+
+# Check IPv6 default route
+ip -6 route show default
+
+# Test IPv6 connectivity
+ping6 -c 3 2001:4860:4860::8888
+
+# Test DNS AAAA
+dig +short google.com AAAA
+
+# Check for router advertisements
+radvdump
+
+# Show neighbor cache (IPv6 ARP)
+ip -6 neigh show
+
+# Check privacy extensions
+ip -6 addr show | grep temporary
+
+# Detect dual-stack
+curl -4 ifconfig.me && curl -6 ifconfig.me
+
+# Test both protocols to same site
+curl -4 -w "%{time_total}\n" -so /dev/null https://google.com
+curl -6 -w "%{time_total}\n" -so /dev/null https://google.com
+----
+
+== Common Problem Quick Fixes
+
+[cols="1,2,2"]
+|===
+|Problem |Quick Check |Quick Fix
+
+|No IPv6 at all
+|`ip -6 addr show`
+|`sysctl -w net.ipv6.conf.all.disable_ipv6=0`
+
+|Only link-local
+|`ip -6 addr show scope global`
+|`systemctl restart NetworkManager`
+
+|No default route
+|`ip -6 route show default`
+|Wait for RA or: `ip -6 route add default via fe80::1 dev eth0`
+
+|Can't ping IPv6
+|`ping6 2001:4860:4860::8888`
+|Check firewall: `ip6tables -A OUTPUT -p icmpv6 -j ACCEPT`
+
+|DNS AAAA fails
+|`dig google.com AAAA`
+|Use IPv6 DNS: `echo "nameserver 2001:4860:4860::8888" >> /etc/resolv.conf`
+
+|Teredo active
+|`ip -6 addr \| grep 2001:0:`
+|Disable: `netsh interface teredo set state disabled` (Win)
+
+|No privacy ext
+|`ip -6 addr \| grep temporary`
+|`sysctl -w net.ipv6.conf.all.use_tempaddr=2`
+
+|Dual-stack slow
+|`time curl -6 google.com`
+|Check gai.conf, enable Happy Eyeballs
+|===
+
+== Network Ambulance Quick Commands
+
+[source,bash]
+----
+# Full IPv4/IPv6 diagnostics
+network-ambulance-d diagnose
+
+# JSON for scripting
+network-ambulance-d diagnose --json | jq '.ipv6'
+
+# Check specific issue
+network-ambulance-d diagnose --json | \
+    jq -r '.ipv6.warnings[]'
+
+# Auto-repair IPv6 issues
+sudo network-ambulance-d repair all
+----
+
+== ICMPv6 Types (MUST ALLOW IN FIREWALL)
+
+[cols="1,2,3"]
+|===
+|Type |Name |Purpose - DO NOT BLOCK
+
+|1
+|Destination Unreachable
+|Error reporting
+
+|2
+|Packet Too Big
+|Path MTU Discovery (CRITICAL)
+
+|128
+|Echo Request
+|Ping requests
+
+|129
+|Echo Reply
+|Ping responses
+
+|133
+|Router Solicitation
+|Request router info
+
+|134
+|Router Advertisement
+|Router provides prefix/gateway (CRITICAL)
+
+|135
+|Neighbor Solicitation
+|Find MAC address (like ARP)
+
+|136
+|Neighbor Advertisement
+|Reply with MAC address (CRITICAL)
+|===
+
+**CRITICAL:** Blocking ICMPv6 types 134-136 BREAKS IPv6 completely.
+
+== IPv6 vs IPv4 Feature Comparison
+
+[cols="2,1,1"]
+|===
+|Feature |IPv4 |IPv6
+
+|Address size
+|32-bit (4 billion)
+|128-bit (340 undecillion)
+
+|Address notation
+|192.168.1.1
+|2001:db8::1
+
+|Auto-configuration
+|DHCP required
+|SLAAC (no server needed)
+
+|NAT required
+|Yes (common)
+|No (end-to-end)
+
+|Broadcast
+|Yes
+|No (multicast instead)
+
+|ARP
+|Yes
+|Neighbor Discovery (ND)
+
+|Fragmentation
+|Routers can fragment
+|Only source can fragment
+
+|Minimum MTU
+|68 bytes
+|1280 bytes
+
+|Header size
+|20-60 bytes (variable)
+|40 bytes (fixed)
+
+|Checksum
+|In IP header
+|Not in IP header
+
+|IPsec
+|Optional
+|Mandatory (originally)
+
+|Multicast
+|Optional
+|Required
+|===
+
+== Dual-Stack Preference Order (RFC 6724)
+
+[source,console]
+----
+# getaddrinfo() address selection priority:
+
+1. Prefer matching scope
+2. Prefer matching label
+3. Prefer higher precedence:
+   - ::1/128          (precedence 50)  - IPv6 loopback
+   - ::/0             (precedence 40)  - IPv6 default
+   - ::ffff:0:0/96    (precedence 35)  - IPv4-mapped
+   - (default)        (precedence 10)  - IPv4
+
+Result: IPv6 preferred over IPv4 by default
+----
+
+**Override:** Edit `/etc/gai.conf`
+
+== Troubleshooting Decision Tree
+
+[source]
+----
+IPv6 Not Working?
+├─ No IPv6 addresses at all?
+│  ├─ YES → Enable IPv6: sysctl -w net.ipv6.conf.all.disable_ipv6=0
+│  └─ NO → Continue
+│
+├─ Only link-local (fe80::)?
+│  ├─ YES → Router advertisement issue
+│  │  ├─ Check RA: radvdump
+│  │  ├─ Restart network: systemctl restart NetworkManager
+│  │  └─ Check router IPv6 enabled
+│  └─ NO → Continue
+│
+├─ Have global address but no connectivity?
+│  ├─ Check default route: ip -6 route show default
+│  │  ├─ Missing → Wait for RA or add manually
+│  │  └─ Present → Continue
+│  ├─ Test gateway: ping6 -c 3 <gateway>
+│  │  ├─ Fails → Gateway down or firewall
+│  │  └─ Works → Continue
+│  └─ Test internet: ping6 -c 3 2001:4860:4860::8888
+│     ├─ Fails → Firewall or ISP issue
+│     └─ Works → DNS issue
+│
+└─ Connectivity works but slow?
+   ├─ Using Teredo/6to4? → Disable tunnels, use native
+   ├─ High latency? → Check ISP IPv6 peering
+   └─ Dual-stack imbalance? → Check address selection policy
+----
+
+== Error Messages Decoded
+
+[cols="2,3"]
+|===
+|Error |Meaning & Fix
+
+|`connect: Network is unreachable` (IPv6)
+|No IPv6 default route. Fix: Wait for RA or add route manually.
+
+|`ping6: sendmsg: Operation not permitted`
+|Firewall blocking ICMPv6. Fix: Allow ICMPv6 in ip6tables.
+
+|`ping6: unknown host`
+|DNS not returning AAAA records. Fix: Use IPv6 DNS server.
+
+|`Destination unreachable: Address unreachable`
+|No route to IPv6 address. Fix: Check routing table.
+
+|`Destination unreachable: No route`
+|Missing default or specific route. Fix: Add route.
+
+|`Time to live exceeded`
+|Routing loop or packet filtering. Fix: Check route table.
+
+|`Packet too big (MTU=1280)`
+|Path MTU < 1280. Fix: Reduce interface MTU or enable PMTUD.
+|===
+
+== Quick Reference: sysctl IPv6 Settings
+
+[source,bash]
+----
+# Show all IPv6 settings
+sysctl -a | grep ipv6
+
+# Essential settings:
+net.ipv6.conf.all.disable_ipv6 = 0           # 0 = enabled
+net.ipv6.conf.all.forwarding = 0             # 0 = host, 1 = router
+net.ipv6.conf.all.accept_ra = 1              # Accept router ads
+net.ipv6.conf.all.autoconf = 1               # Enable SLAAC
+net.ipv6.conf.all.use_tempaddr = 2           # Privacy extensions
+net.ipv6.conf.default.accept_ra_pinfo = 1    # Accept prefix info
+net.ipv6.conf.default.accept_ra_defrtr = 1   # Accept default router
+
+# MTU settings:
+net.ipv6.conf.all.mtu = 1500                 # Interface MTU
+net.ipv6.route.mtu_expires = 600             # Path MTU cache time
+
+# Neighbor discovery:
+net.ipv6.neigh.default.gc_thresh1 = 128      # ND cache threshold
+----
+
+== Emergency Fixes
+
+[source,bash]
+----
+# Full IPv6 reset (non-destructive)
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sleep 2
+sysctl -w net.ipv6.conf.all.disable_ipv6=0
+systemctl restart NetworkManager
+
+# Force new IPv6 address
+ip -6 addr flush dev eth0 scope global
+# Wait for RA to assign new address
+
+# Manually add global IPv6 (if you know it)
+ip -6 addr add 2001:db8::100/64 dev eth0
+ip -6 route add default via fe80::1 dev eth0
+
+# Test immediately
+ping6 -c 1 2001:4860:4860::8888 && echo "IPv6 working!"
+----
+
+== Integration with Network Ambulance
+
+The network ambulance automatically detects and diagnoses:
+
+✅ **Detected Automatically:**
+* Missing IPv6 addresses
+* Missing default route
+* Router advertisement failures
+* Privacy extension status
+* Transition mechanisms (Teredo, 6to4)
+* Dual-stack imbalance
+* MTU issues
+* DNS AAAA resolution problems
+* Latency issues
+* Firewall blocking ICMPv6
+
+✅ **Automated Repairs:**
+* Enable IPv6 if disabled
+* Add default route
+* Configure privacy extensions
+* Disable deprecated tunnels
+* Fix DNS configuration
+* Restart network services
+
+✅ **Monitoring Capabilities:**
+* Continuous connectivity monitoring
+* Latency tracking (both protocols)
+* Traffic distribution analysis
+* Automatic alerting on failures
+* Prometheus metrics export
+
+== Testing URLs
+
+[source,bash]
+----
+# IPv4 only
+curl -4 https://ipv4.google.com
+
+# IPv6 only
+curl -6 https://ipv6.google.com
+
+# Dual-stack (auto-select)
+curl https://google.com
+
+# Test sites
+https://test-ipv6.com        # Comprehensive IPv6 test
+https://ipv6-test.com        # Score your IPv6 setup
+https://www.whatismyip.com   # Show both IPs
+----
+
+== Production Monitoring Checklist
+
+- [ ] Monitor IPv6 global address presence
+- [ ] Monitor IPv6 default route presence
+- [ ] Monitor IPv6 connectivity (ping6 to public DNS)
+- [ ] Monitor IPv6 DNS resolution (AAAA records)
+- [ ] Monitor IPv6 latency vs IPv4 latency
+- [ ] Alert on Teredo/6to4 activation
+- [ ] Alert on privacy extension failures
+- [ ] Monitor dual-stack traffic distribution
+- [ ] Check for MTU issues
+- [ ] Verify ICMPv6 not blocked
+- [ ] Test Happy Eyeballs behavior
+- [ ] Monitor for CGNAT deployment
+- [ ] Track IPv6 prefix changes (ISP renumbering)
+- [ ] Monitor for IPv6 deprecation warnings
+- [ ] Verify router advertisement interval normal
