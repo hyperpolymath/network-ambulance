@@ -1,0 +1,30 @@
+{
+  "name": "network-ambulance",
+  "version": "1.1.0",
+  "sources": [
+    {
+      "dir": "src/rescript",
+      "subdirs": true
+    }
+  ],
+  "package-specs": [
+    {
+      "module": "esmodule",
+      "in-source": true
+    }
+  ],
+  "suffix": ".res.js",
+  "bs-dependencies": [],
+  "external-stdlib": "@rescript/core",
+  "pinned-dependencies": [],
+  "warnings": {
+    "error": "+101+8"
+  },
+  "bsc-flags": [
+    "-bs-super-errors"
+  ],
+  "jsx": {
+    "version": 4,
+    "mode": "automatic"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Network Ambulance",
+  "version": "1.1.0",
+  "identifier": "com.hyperpolymath.network-ambulance",
+  "build": {
+    "beforeDevCommand": "deno task dev",
+    "beforeBuildCommand": "deno task build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "nsis", "dmg", "app"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "Network diagnostics and repair tool",
+    "longDescription": "Cross-platform network diagnostics and automated repair utility with formally verified components",
+    "linux": {
+      "deb": {
+        "depends": ["iproute2", "iputils-ping", "dnsutils"]
+      }
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Network Ambulance",
+        "width": 1024,
+        "height": 768,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "tooltip": "Network Ambulance"
+    }
+  },
+  "plugins": {
+    "shell": {
+      "scope": [
+        {
+          "name": "network-ambulance-d",
+          "cmd": "bin/network-ambulance-d",
+          "args": ["diagnose", "--json"],
+          "sidecar": false
+        },
+        {
+          "name": "network-ambulance-repair",
+          "cmd": "bin/network-ambulance-d",
+          "args": ["repair", "$TARGET", "--json"],
+          "sidecar": false
+        }
+      ]
+    }
+  }
+}

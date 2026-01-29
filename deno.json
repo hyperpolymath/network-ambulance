@@ -1,0 +1,36 @@
+{
+  "name": "@hyperpolymath/network-ambulance",
+  "version": "1.1.0",
+  "exports": "./src/rescript/main.res.js",
+  "tasks": {
+    "dev": "deno run --allow-read --allow-write --allow-net --allow-run npm:vite",
+    "build": "deno run --allow-read --allow-write --allow-run npm:rescript build && deno run --allow-read --allow-write --allow-run npm:vite build",
+    "tauri:dev": "deno task dev & cargo tauri dev",
+    "tauri:build": "deno task build && cargo tauri build",
+    "rescript": "deno run --allow-read --allow-write --allow-run npm:rescript",
+    "format": "deno fmt src/rescript"
+  },
+  "imports": {
+    "vite": "npm:vite@^5.0.0",
+    "rescript": "npm:rescript@^11.0.0",
+    "@rescript/core": "npm:@rescript/core@^1.0.0"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "semiColons": false,
+    "singleQuote": false,
+    "proseWrap": "preserve"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  }
+}

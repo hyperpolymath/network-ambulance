@@ -1,0 +1,379 @@
+/* SPDX-License-Identifier: PMPL-1.0-or-later */
+/* Network Ambulance - Main Stylesheet */
+
+:root {
+  --primary: #0066cc;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --bg: #ffffff;
+  --bg-alt: #f8f9fa;
+  --text: #212529;
+  --border: #dee2e6;
+  --shadow: rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #4da6ff;
+    --success: #3dd365;
+    --warning: #ffd454;
+    --danger: #ff6b7a;
+    --bg: #1a1a1a;
+    --bg-alt: #2d2d2d;
+    --text: #e9ecef;
+    --border: #495057;
+    --shadow: rgba(0, 0, 0, 0.3);
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+               Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+header {
+  background: var(--primary);
+  color: white;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.platform {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  text-transform: capitalize;
+}
+
+.nav {
+  display: flex;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  gap: 0.5rem;
+}
+
+.nav button {
+  background: transparent;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.nav button:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.nav button.active {
+  background: var(--primary);
+  color: white;
+}
+
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  gap: 2rem;
+}
+
+.welcome h1 {
+  font-size: 3rem;
+  color: var(--primary);
+}
+
+.welcome p {
+  font-size: 1.25rem;
+  color: var(--text);
+  opacity: 0.8;
+}
+
+.primary-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 6px var(--shadow);
+}
+
+.primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px var(--shadow);
+}
+
+.primary-btn:active {
+  transform: translateY(0);
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1.5rem;
+}
+
+.spinner {
+  width: 4rem;
+  height: 4rem;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.health-status {
+  padding: 2rem;
+  border-radius: 0.5rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.health-status.healthy {
+  background: var(--success);
+  color: white;
+}
+
+.health-status.problems {
+  background: var(--warning);
+  color: #000;
+}
+
+.health-status h2 {
+  font-size: 2rem;
+}
+
+.diagnostic-section {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.diagnostic-section h3 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: var(--primary);
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--bg);
+  border-radius: 0.25rem;
+  border: 1px solid var(--border);
+}
+
+.status-item.green {
+  border-color: var(--success);
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.status-item.red {
+  border-color: var(--danger);
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.status-item .icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.status-item.green .icon {
+  color: var(--success);
+}
+
+.status-item.red .icon {
+  color: var(--danger);
+}
+
+.warnings {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid var(--warning);
+  border-radius: 0.25rem;
+}
+
+.warnings h4 {
+  margin-bottom: 0.5rem;
+  color: var(--warning);
+}
+
+.warning {
+  padding: 0.25rem 0;
+  color: var(--text);
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  justify-content: center;
+}
+
+button {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+button:hover {
+  background: var(--border);
+}
+
+.repair-btn {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.repair-btn:hover {
+  background: #0052a3;
+}
+
+.repair-result {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.repair-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.repair-status {
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+.repair-status.success {
+  background: var(--success);
+  color: white;
+}
+
+.repair-status.failed {
+  background: var(--danger);
+  color: white;
+}
+
+.error {
+  background: rgba(220, 53, 69, 0.1);
+  border: 1px solid var(--danger);
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+.error h2 {
+  color: var(--danger);
+  margin-bottom: 1rem;
+}
+
+.error button {
+  margin-top: 1rem;
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  header {
+    padding: 1rem;
+  }
+
+  header h1 {
+    font-size: 1.25rem;
+  }
+
+  main {
+    padding: 1rem;
+  }
+
+  .welcome h1 {
+    font-size: 2rem;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .nav {
+    overflow-x: auto;
+  }
+}
