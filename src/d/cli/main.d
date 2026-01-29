@@ -16,6 +16,7 @@ import core.diagnostics.routing;
 import core.diagnostics.connectivity;
 import core.repairs.dns_repair;
 import core.repairs.interface_repair;
+import core.repairs.routing_repair;
 
 /// CLI commands
 enum Command {
@@ -395,10 +396,43 @@ int runRepair(string target, bool verbose) {
         }
     }
 
-    // Routing repair (placeholder)
+    // Routing repair
     if (repairTarget == RepairTarget.Routing || repairTarget == RepairTarget.All) {
         writeln("=== Routing Repair ===");
-        writeln("  Routing repair not yet implemented\n");
+
+        auto routeDiag = diagnoseRouting(platform);
+        auto routeResult = repairRouting(platform, routeDiag);
+
+        foreach (action; routeResult.actions) {
+            writeln("  ", action);
+        }
+
+        foreach (error; routeResult.errors) {
+            writeln("  ✗ ", error);
+        }
+
+        if (routeResult.addedRoutes.length > 0) {
+            writeln("\nAdded routes:");
+            foreach (route; routeResult.addedRoutes) {
+                writefln("  %s via %s dev %s",
+                        route.destination, route.gateway, route.interfaceName);
+            }
+        }
+
+        if (routeResult.removedRoutes.length > 0) {
+            writeln("\nRemoved routes:");
+            foreach (route; routeResult.removedRoutes) {
+                writefln("  %s via %s dev %s",
+                        route.destination, route.gateway, route.interfaceName);
+            }
+        }
+
+        if (routeResult.success) {
+            writeln("✓ Routing repair completed\n");
+            anyRepaired = true;
+        } else {
+            writeln("✗ Routing repair failed\n");
+        }
     }
 
     return anyRepaired ? 0 : 1;
