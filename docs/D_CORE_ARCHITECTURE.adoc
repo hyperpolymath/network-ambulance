@@ -1,0 +1,1885 @@
+= Network Ambulance D Core Architecture
+Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>
+v1.0, 2026-01-29
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+=== Rationale for D + Zig
+
+Network Ambulance is being rewritten from Bash to a hybrid D + Zig architecture to achieve:
+
+* **Memory Safety**: D's `@safe` subset prevents buffer overflows and null pointer dereferences
+* **Performance**: Compiled code dramatically faster than shell scripts
+* **Cross-Platform**: Support Linux, macOS, BSD, and Windows with a single codebase
+* **Maintainability**: Strong typing and compile-time checks catch errors early
+* **Low-Level Access**: Zig for kernel interfaces, BPF, and raw sockets where needed
+
+.Language Division of Responsibility
+[cols="1,2,2"]
+|===
+| Language | Use Cases | Rationale
+
+| D
+| Core diagnostics, repair logic, CLI, platform abstraction
+| Memory safety, fast compilation, excellent C interop, batteries-included stdlib
+
+| Zig
+| BPF programs, raw sockets, kernel modules, performance-critical paths
+| Zero-cost C interop, comptime, minimal runtime, cross-compilation
+
+| Bash
+| Legacy wrappers during migration, system integration scripts
+| Gradual phase-out as modules are ported
+|===
+
+=== Cross-Platform Goals
+
+.Platform Support Matrix
+[cols="1,1,3"]
+|===
+| Platform | Support Level | Key Features
+
+| Linux
+| **Full**
+| netlink, tc, iptables, BPF, systemd-resolved integration
+
+| macOS
+| **Diagnostics Only**
+| sysctl, route, networksetup, scutil
+
+| FreeBSD/OpenBSD
+| **Diagnostics + Limited Repairs**
+| Similar to Linux but different syscalls (ROUTE_SOCKET vs netlink)
+
+| Windows
+| **Experimental**
+| WMI, netsh, or WSL bridge for diagnostics
+|===
+
+== Architecture Layers
+
+=== Layer 1: Platform Abstraction Layer (PAL)
+
+The PAL abstracts platform-specific operations behind a common interface.
+
+[source,d]
+----
+// src/core/platform/interfaces.d
+module core.platform.interfaces;
+
+/**
+ * Network interface abstraction
+ */
+interface INetworkInterface {
+    /// Get all network interfaces
+    NetworkInterface[] getInterfaces() @safe;
+
+    /// Get interface status
+    InterfaceStatus getStatus(string ifname) @safe;
+
+    /// Enable/disable interface
+    bool setEnabled(string ifname, bool enabled) @safe;
+
+    /// Get IP addresses assigned to interface
+    IPAddress[] getAddresses(string ifname) @safe;
+}
+
+/**
+ * DNS resolver abstraction
+ */
+interface IDNSResolver {
+    /// Get current DNS servers
+    IPAddress[] getDNSServers() @safe;
+
+    /// Test DNS resolution
+    DNSResult resolve(string hostname) @safe;
+
+    /// Set DNS servers (with rollback capability)
+    bool setDNSServers(IPAddress[] servers, out RollbackToken token) @safe;
+}
+
+/**
+ * Routing table abstraction
+ */
+interface IRoutingTable {
+    /// Get default gateway
+    IPAddress getDefaultGateway() @safe;
+
+    /// Get all routes
+    Route[] getRoutes() @safe;
+
+    /// Add route (with rollback)
+    bool addRoute(Route route, out RollbackToken token) @safe;
+
+    /// Delete route (with rollback)
+    bool deleteRoute(Route route, out RollbackToken token) @safe;
+}
+
+struct NetworkInterface {
+    string name;
+    string macAddress;
+    InterfaceType type;
+    bool isUp;
+    bool hasCarrier;
+}
+
+struct InterfaceStatus {
+    bool linkUp;
+    bool hasIPv4;
+    bool hasIPv6;
+    ulong rxBytes;
+    ulong txBytes;
+    ulong rxErrors;
+    ulong txErrors;
+}
+
+struct IPAddress {
+    string address;
+    AddressFamily family;
+    uint prefixLength;
+}
+
+struct Route {
+    IPAddress destination;
+    IPAddress gateway;
+    string interfaceName;
+    uint metric;
+}
+
+enum InterfaceType {
+    Ethernet,
+    WiFi,
+    Loopback,
+    Virtual,
+    Unknown
+}
+
+enum AddressFamily {
+    IPv4,
+    IPv6
+}
+
+struct RollbackToken {
+    void* platformData;
+    void function(void*) rollbackFunc;
+}
+
+struct DNSResult {
+    bool success;
+    IPAddress[] addresses;
+    long queryTimeMs;
+    string error;
+}
+----
+
+=== Layer 2: Platform Implementations
+
+==== Linux Implementation
+
+[source,d]
+----
+// src/core/platform/linux.d
+module core.platform.linux;
+
+import core.platform.interfaces;
+import core.sys.linux.netlink;
+import std.socket;
+import std.string;
+import std.conv;
+
+/**
+ * Linux implementation using netlink sockets
+ */
+class LinuxNetworkInterface : INetworkInterface {
+    NetworkInterface[] getInterfaces() @trusted {
+        // Use netlink RTNETLINK to enumerate interfaces
+        auto sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+        scope(exit) sock.close();
+
+        // Send RTM_GETLINK request
+        // Parse IFLA_* attributes
+        // (Implementation details omitted for brevity)
+
+        NetworkInterface[] interfaces;
+        // ... populate from netlink response
+        return interfaces;
+    }
+
+    InterfaceStatus getStatus(string ifname) @trusted {
+        // Read from /sys/class/net/{ifname}/
+        import std.file : readText;
+        import std.path : buildPath;
+
+        string sysPath = buildPath("/sys/class/net", ifname);
+
+        InterfaceStatus status;
+        status.linkUp = readText(buildPath(sysPath, "operstate")) == "up\n";
+        status.hasCarrier = readText(buildPath(sysPath, "carrier")) == "1\n";
+        status.rxBytes = readText(buildPath(sysPath, "statistics/rx_bytes")).strip().to!ulong;
+        status.txBytes = readText(buildPath(sysPath, "statistics/tx_bytes")).strip().to!ulong;
+        status.rxErrors = readText(buildPath(sysPath, "statistics/rx_errors")).strip().to!ulong;
+        status.txErrors = readText(buildPath(sysPath, "statistics/tx_errors")).strip().to!ulong;
+
+        return status;
+    }
+
+    bool setEnabled(string ifname, bool enabled) @trusted {
+        import std.process : execute;
+
+        string action = enabled ? "up" : "down";
+        auto result = execute(["ip", "link", "set", ifname, action]);
+        return result.status == 0;
+    }
+
+    IPAddress[] getAddresses(string ifname) @trusted {
+        // Use netlink RTM_GETADDR
+        // (Implementation details omitted)
+        IPAddress[] addresses;
+        return addresses;
+    }
+}
+
+/**
+ * Linux DNS resolver using systemd-resolved or /etc/resolv.conf
+ */
+class LinuxDNSResolver : IDNSResolver {
+    private bool useSystemdResolved;
+
+    this() @safe {
+        import std.file : exists;
+        useSystemdResolved = exists("/run/systemd/resolve/resolv.conf");
+    }
+
+    IPAddress[] getDNSServers() @trusted {
+        if (useSystemdResolved) {
+            return getSystemdResolvedServers();
+        } else {
+            return parseResolvConf();
+        }
+    }
+
+    private IPAddress[] getSystemdResolvedServers() @trusted {
+        import std.process : execute;
+        import std.algorithm : splitter, map, filter;
+        import std.array : array;
+
+        auto result = execute(["resolvectl", "status"]);
+        if (result.status != 0) return [];
+
+        // Parse output for "DNS Servers:" lines
+        // (Simplified example)
+        IPAddress[] servers;
+        foreach (line; result.output.splitter("\n")) {
+            if (line.canFind("DNS Servers:")) {
+                // Extract IP addresses
+            }
+        }
+        return servers;
+    }
+
+    private IPAddress[] parseResolvConf() @trusted {
+        import std.file : readText;
+        import std.algorithm : splitter, filter, map;
+        import std.array : array;
+        import std.string : strip, startsWith;
+
+        string content = readText("/etc/resolv.conf");
+
+        return content.splitter("\n")
+            .filter!(line => line.strip().startsWith("nameserver"))
+            .map!((line) {
+                auto parts = line.strip().splitter();
+                parts.popFront(); // Skip "nameserver"
+                string ip = parts.front;
+                return IPAddress(ip, ip.canFind(":") ? AddressFamily.IPv6 : AddressFamily.IPv4, 0);
+            })
+            .array;
+    }
+
+    DNSResult resolve(string hostname) @trusted {
+        import std.datetime.stopwatch : StopWatch, AutoStart;
+        import std.socket : getAddressInfo, AddressFamily;
+
+        auto sw = StopWatch(AutoStart.yes);
+
+        try {
+            auto addresses = getAddressInfo(hostname);
+            sw.stop();
+
+            IPAddress[] results;
+            foreach (addr; addresses) {
+                results ~= IPAddress(
+                    addr.toAddrString(),
+                    addr.addressFamily == AddressFamily.INET ? AddressFamily.IPv4 : AddressFamily.IPv6,
+                    0
+                );
+            }
+
+            return DNSResult(
+                true,
+                results,
+                sw.peek().total!"msecs",
+                ""
+            );
+        } catch (Exception e) {
+            sw.stop();
+            return DNSResult(
+                false,
+                [],
+                sw.peek().total!"msecs",
+                e.msg
+            );
+        }
+    }
+
+    bool setDNSServers(IPAddress[] servers, out RollbackToken token) @trusted {
+        // Backup current configuration
+        import std.file : copy, readText, write;
+        import std.path : buildPath;
+        import std.uuid : randomUUID;
+
+        string backupPath = buildPath("/tmp", "resolv.conf.backup." ~ randomUUID().toString());
+        copy("/etc/resolv.conf", backupPath);
+
+        // Create rollback token
+        token.platformData = cast(void*)new string(backupPath);
+        token.rollbackFunc = (void* data) {
+            string backup = *(cast(string*)data);
+            copy(backup, "/etc/resolv.conf");
+        };
+
+        // Write new configuration
+        string newConfig = generateResolvConf(servers);
+        write("/etc/resolv.conf", newConfig);
+
+        return true;
+    }
+
+    private string generateResolvConf(IPAddress[] servers) @safe {
+        import std.array : Appender;
+
+        auto app = Appender!string();
+        app ~= "# Generated by network-ambulance\n";
+
+        foreach (server; servers) {
+            app ~= "nameserver " ~ server.address ~ "\n";
+        }
+
+        return app.data;
+    }
+}
+----
+
+==== macOS Implementation
+
+[source,d]
+----
+// src/core/platform/darwin.d
+module core.platform.darwin;
+
+import core.platform.interfaces;
+import std.process;
+import std.algorithm;
+import std.array;
+
+/**
+ * macOS implementation using networksetup and scutil
+ */
+class DarwinNetworkInterface : INetworkInterface {
+    NetworkInterface[] getInterfaces() @trusted {
+        auto result = execute(["networksetup", "-listallhardwareports"]);
+        if (result.status != 0) return [];
+
+        // Parse output:
+        // Hardware Port: Wi-Fi
+        // Device: en0
+        // Ethernet Address: xx:xx:xx:xx:xx:xx
+
+        NetworkInterface[] interfaces;
+        // (Parsing logic omitted for brevity)
+        return interfaces;
+    }
+
+    InterfaceStatus getStatus(string ifname) @trusted {
+        import std.string : strip, split;
+
+        auto result = execute(["ifconfig", ifname]);
+        if (result.status != 0) {
+            return InterfaceStatus.init;
+        }
+
+        InterfaceStatus status;
+        foreach (line; result.output.split("\n")) {
+            if (line.canFind("status: active")) {
+                status.linkUp = true;
+            }
+            if (line.canFind("inet ")) {
+                status.hasIPv4 = true;
+            }
+            if (line.canFind("inet6 ")) {
+                status.hasIPv6 = true;
+            }
+        }
+
+        // macOS doesn't expose statistics as easily as Linux
+        // Would need to use sysctl or netstat
+
+        return status;
+    }
+
+    bool setEnabled(string ifname, bool enabled) @trusted {
+        // macOS requires the "service name" not device name
+        string serviceName = getServiceNameForDevice(ifname);
+        if (serviceName.length == 0) return false;
+
+        string state = enabled ? "on" : "off";
+        auto result = execute(["networksetup", "-setnetworkserviceenabled", serviceName, state]);
+        return result.status == 0;
+    }
+
+    private string getServiceNameForDevice(string ifname) @trusted {
+        auto result = execute(["networksetup", "-listallhardwareports"]);
+        if (result.status != 0) return "";
+
+        // Parse to find service name for device
+        // (Implementation omitted)
+        return "";
+    }
+
+    IPAddress[] getAddresses(string ifname) @trusted {
+        auto result = execute(["ifconfig", ifname]);
+        if (result.status != 0) return [];
+
+        // Parse inet and inet6 lines
+        IPAddress[] addresses;
+        // (Parsing logic omitted)
+        return addresses;
+    }
+}
+
+/**
+ * macOS DNS resolver using scutil
+ */
+class DarwinDNSResolver : IDNSResolver {
+    IPAddress[] getDNSServers() @trusted {
+        auto result = execute(["scutil", "--dns"]);
+        if (result.status != 0) return [];
+
+        // Parse output for nameserver entries
+        IPAddress[] servers;
+        foreach (line; result.output.split("\n")) {
+            if (line.canFind("nameserver[")) {
+                // Extract IP: "  nameserver[0] : 8.8.8.8"
+                auto parts = line.split(":");
+                if (parts.length >= 2) {
+                    string ip = parts[1].strip();
+                    servers ~= IPAddress(ip, ip.canFind(":") ? AddressFamily.IPv6 : AddressFamily.IPv4, 0);
+                }
+            }
+        }
+
+        return servers;
+    }
+
+    DNSResult resolve(string hostname) @trusted {
+        import std.datetime.stopwatch : StopWatch, AutoStart;
+
+        auto sw = StopWatch(AutoStart.yes);
+        auto result = execute(["dig", "+short", hostname]);
+        sw.stop();
+
+        if (result.status != 0) {
+            return DNSResult(false, [], sw.peek().total!"msecs", "dig failed");
+        }
+
+        IPAddress[] addresses;
+        foreach (line; result.output.split("\n")) {
+            string ip = line.strip();
+            if (ip.length > 0) {
+                addresses ~= IPAddress(ip, ip.canFind(":") ? AddressFamily.IPv6 : AddressFamily.IPv4, 0);
+            }
+        }
+
+        return DNSResult(true, addresses, sw.peek().total!"msecs", "");
+    }
+
+    bool setDNSServers(IPAddress[] servers, out RollbackToken token) @trusted {
+        // macOS requires setting DNS per network service
+        // Get active network service
+        auto serviceResult = execute(["networksetup", "-listallnetworkservices"]);
+        if (serviceResult.status != 0) return false;
+
+        // Backup current DNS settings
+        string serviceName = "Wi-Fi"; // Should detect active service
+        auto backupResult = execute(["networksetup", "-getdnsservers", serviceName]);
+
+        token.platformData = cast(void*)new string(backupResult.output);
+        token.rollbackFunc = (void* data) {
+            string backup = *(cast(string*)data);
+            // Restore DNS servers
+            execute(["networksetup", "-setdnsservers", serviceName] ~ backup.split("\n"));
+        };
+
+        // Set new DNS servers
+        string[] args = ["networksetup", "-setdnsservers", serviceName];
+        foreach (server; servers) {
+            args ~= server.address;
+        }
+
+        auto result = execute(args);
+        return result.status == 0;
+    }
+}
+----
+
+=== Layer 3: Core Diagnostics Engine
+
+[source,d]
+----
+// src/core/diagnostics/dns.d
+module core.diagnostics.dns;
+
+import core.platform.interfaces;
+import std.datetime;
+import std.algorithm;
+
+/**
+ * DNS diagnostic module
+ */
+class DNSDiagnostics {
+    private IDNSResolver resolver;
+
+    this(IDNSResolver resolver) @safe {
+        this.resolver = resolver;
+    }
+
+    /**
+     * Run comprehensive DNS diagnostics
+     */
+    DNSDiagnosticResult diagnose() @safe {
+        DNSDiagnosticResult result;
+
+        // Test 1: Check configured DNS servers
+        result.configuredServers = resolver.getDNSServers();
+        result.hasConfiguredServers = result.configuredServers.length > 0;
+
+        // Test 2: Test resolution of known-good domains
+        string[] testDomains = [
+            "google.com",
+            "cloudflare.com",
+            "github.com"
+        ];
+
+        foreach (domain; testDomains) {
+            auto dnsResult = resolver.resolve(domain);
+            result.resolutionTests ~= ResolutionTest(
+                domain,
+                dnsResult.success,
+                dnsResult.queryTimeMs,
+                dnsResult.addresses.length
+            );
+
+            if (dnsResult.success) {
+                result.successfulResolutions++;
+            }
+        }
+
+        // Test 3: Check resolution speed
+        result.averageQueryTime = result.resolutionTests
+            .map!(t => t.queryTimeMs)
+            .sum() / result.resolutionTests.length;
+
+        result.isHealthy = result.successfulResolutions == testDomains.length &&
+                          result.averageQueryTime < 500; // 500ms threshold
+
+        return result;
+    }
+
+    /**
+     * Diagnose specific DNS issue
+     */
+    DNSIssue[] identifyIssues() @safe {
+        DNSIssue[] issues;
+        auto result = diagnose();
+
+        if (!result.hasConfiguredServers) {
+            issues ~= DNSIssue(
+                DNSIssueType.NoConfiguredServers,
+                "No DNS servers configured",
+                DNSSeverity.Critical
+            );
+        }
+
+        if (result.successfulResolutions == 0) {
+            issues ~= DNSIssue(
+                DNSIssueType.ResolutionFailure,
+                "All DNS resolutions failed",
+                DNSSeverity.Critical
+            );
+        } else if (result.successfulResolutions < 3) {
+            issues ~= DNSIssue(
+                DNSIssueType.IntermittentFailure,
+                "Some DNS resolutions failed",
+                DNSSeverity.Warning
+            );
+        }
+
+        if (result.averageQueryTime > 1000) {
+            issues ~= DNSIssue(
+                DNSIssueType.SlowResolution,
+                "DNS queries are slow (avg: " ~ result.averageQueryTime.to!string ~ "ms)",
+                DNSSeverity.Warning
+            );
+        }
+
+        return issues;
+    }
+}
+
+struct DNSDiagnosticResult {
+    bool hasConfiguredServers;
+    IPAddress[] configuredServers;
+    ResolutionTest[] resolutionTests;
+    int successfulResolutions;
+    long averageQueryTime;
+    bool isHealthy;
+}
+
+struct ResolutionTest {
+    string domain;
+    bool success;
+    long queryTimeMs;
+    size_t addressCount;
+}
+
+struct DNSIssue {
+    DNSIssueType type;
+    string description;
+    DNSSeverity severity;
+}
+
+enum DNSIssueType {
+    NoConfiguredServers,
+    ResolutionFailure,
+    IntermittentFailure,
+    SlowResolution
+}
+
+enum DNSSeverity {
+    Info,
+    Warning,
+    Critical
+}
+----
+
+[source,d]
+----
+// src/core/diagnostics/connectivity.d
+module core.diagnostics.connectivity;
+
+import core.platform.interfaces;
+import std.socket;
+import std.datetime.stopwatch;
+
+/**
+ * Network connectivity diagnostics
+ */
+class ConnectivityDiagnostics {
+    private INetworkInterface netif;
+    private IRoutingTable routing;
+
+    this(INetworkInterface netif, IRoutingTable routing) @safe {
+        this.netif = netif;
+        this.routing = routing;
+    }
+
+    /**
+     * Test basic connectivity
+     */
+    ConnectivityResult diagnose() @safe {
+        ConnectivityResult result;
+
+        // Test 1: Check interface status
+        auto interfaces = netif.getInterfaces();
+        result.activeInterfaces = interfaces.filter!(i => i.isUp && i.hasCarrier).array;
+        result.hasActiveInterface = result.activeInterfaces.length > 0;
+
+        // Test 2: Check default gateway
+        try {
+            result.defaultGateway = routing.getDefaultGateway();
+            result.hasDefaultGateway = true;
+
+            // Test 3: Ping default gateway
+            result.gatewayReachable = pingHost(result.defaultGateway.address);
+        } catch (Exception e) {
+            result.hasDefaultGateway = false;
+            result.gatewayReachable = false;
+        }
+
+        // Test 4: Ping public IP (1.1.1.1 - Cloudflare DNS)
+        result.internetReachable = pingHost("1.1.1.1");
+
+        // Test 5: Check if we can establish TCP connection (port 80)
+        result.httpReachable = testTCPConnection("1.1.1.1", 80);
+
+        result.isHealthy = result.hasActiveInterface &&
+                          result.hasDefaultGateway &&
+                          result.internetReachable;
+
+        return result;
+    }
+
+    private bool pingHost(string host) @trusted {
+        import std.process : execute;
+
+        // Use platform-specific ping
+        version(linux) {
+            auto result = execute(["ping", "-c", "1", "-W", "2", host]);
+            return result.status == 0;
+        } else version(OSX) {
+            auto result = execute(["ping", "-c", "1", "-t", "2", host]);
+            return result.status == 0;
+        } else {
+            return false;
+        }
+    }
+
+    private bool testTCPConnection(string host, ushort port) @trusted {
+        try {
+            auto socket = new TcpSocket();
+            socket.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, dur!"seconds"(2));
+
+            auto sw = StopWatch(AutoStart.yes);
+            socket.connect(new InternetAddress(host, port));
+            sw.stop();
+
+            socket.close();
+            return sw.peek().total!"seconds" < 2;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+}
+
+struct ConnectivityResult {
+    bool hasActiveInterface;
+    NetworkInterface[] activeInterfaces;
+    bool hasDefaultGateway;
+    IPAddress defaultGateway;
+    bool gatewayReachable;
+    bool internetReachable;
+    bool httpReachable;
+    bool isHealthy;
+}
+----
+
+=== Layer 4: Repair Engine
+
+[source,d]
+----
+// src/core/repairs/dns_repair.d
+module core.repairs.dns_repair;
+
+import core.platform.interfaces;
+import core.diagnostics.dns;
+import std.algorithm;
+
+/**
+ * DNS repair module with automatic rollback
+ */
+class DNSRepair {
+    private IDNSResolver resolver;
+    private RollbackToken[] rollbackStack;
+
+    this(IDNSResolver resolver) @safe {
+        this.resolver = resolver;
+    }
+
+    /**
+     * Attempt to repair DNS issues
+     */
+    RepairResult repairDNS(DNSIssue[] issues) @safe {
+        RepairResult result;
+
+        foreach (issue; issues) {
+            final switch (issue.type) {
+                case DNSIssueType.NoConfiguredServers:
+                case DNSIssueType.ResolutionFailure:
+                    result.actions ~= setPublicDNS();
+                    break;
+
+                case DNSIssueType.SlowResolution:
+                    result.actions ~= optimizeDNS();
+                    break;
+
+                case DNSIssueType.IntermittentFailure:
+                    result.actions ~= addBackupDNS();
+                    break;
+            }
+        }
+
+        // Verify repairs worked
+        auto diagnostics = new DNSDiagnostics(resolver);
+        auto postRepair = diagnostics.diagnose();
+
+        result.success = postRepair.isHealthy;
+
+        if (!result.success) {
+            // Rollback all changes
+            rollbackAll();
+            result.actions ~= RepairAction(
+                "Rollback",
+                "Repairs failed, rolling back changes",
+                false
+            );
+        }
+
+        return result;
+    }
+
+    private RepairAction setPublicDNS() @safe {
+        // Use Cloudflare and Google DNS
+        IPAddress[] publicDNS = [
+            IPAddress("1.1.1.1", AddressFamily.IPv4, 0),
+            IPAddress("1.0.0.1", AddressFamily.IPv4, 0),
+            IPAddress("8.8.8.8", AddressFamily.IPv4, 0),
+            IPAddress("8.8.4.4", AddressFamily.IPv4, 0)
+        ];
+
+        RollbackToken token;
+        bool success = resolver.setDNSServers(publicDNS, token);
+
+        if (success) {
+            rollbackStack ~= token;
+        }
+
+        return RepairAction(
+            "Set Public DNS",
+            "Configured Cloudflare (1.1.1.1) and Google (8.8.8.8) DNS",
+            success
+        );
+    }
+
+    private RepairAction optimizeDNS() @safe {
+        // Benchmark multiple DNS providers and select fastest
+        IPAddress[][] dnsProviders = [
+            [IPAddress("1.1.1.1", AddressFamily.IPv4, 0), IPAddress("1.0.0.1", AddressFamily.IPv4, 0)], // Cloudflare
+            [IPAddress("8.8.8.8", AddressFamily.IPv4, 0), IPAddress("8.8.4.4", AddressFamily.IPv4, 0)], // Google
+            [IPAddress("9.9.9.9", AddressFamily.IPv4, 0), IPAddress("149.112.112.112", AddressFamily.IPv4, 0)] // Quad9
+        ];
+
+        long bestTime = long.max;
+        IPAddress[] bestProvider;
+
+        foreach (provider; dnsProviders) {
+            RollbackToken tempToken;
+            resolver.setDNSServers(provider, tempToken);
+
+            // Test resolution speed
+            import std.datetime.stopwatch : StopWatch, AutoStart;
+            auto sw = StopWatch(AutoStart.yes);
+            resolver.resolve("google.com");
+            resolver.resolve("github.com");
+            sw.stop();
+
+            long avgTime = sw.peek().total!"msecs" / 2;
+            if (avgTime < bestTime) {
+                bestTime = avgTime;
+                bestProvider = provider;
+            }
+
+            // Rollback test
+            if (tempToken.rollbackFunc !is null) {
+                tempToken.rollbackFunc(tempToken.platformData);
+            }
+        }
+
+        // Set best provider
+        RollbackToken token;
+        bool success = resolver.setDNSServers(bestProvider, token);
+
+        if (success) {
+            rollbackStack ~= token;
+        }
+
+        return RepairAction(
+            "Optimize DNS",
+            "Selected fastest DNS provider (avg: " ~ bestTime.to!string ~ "ms)",
+            success
+        );
+    }
+
+    private RepairAction addBackupDNS() @safe {
+        // Add additional DNS servers for redundancy
+        auto current = resolver.getDNSServers();
+
+        if (current.length < 4) {
+            current ~= IPAddress("1.1.1.1", AddressFamily.IPv4, 0);
+            current ~= IPAddress("8.8.8.8", AddressFamily.IPv4, 0);
+
+            RollbackToken token;
+            bool success = resolver.setDNSServers(current, token);
+
+            if (success) {
+                rollbackStack ~= token;
+            }
+
+            return RepairAction(
+                "Add Backup DNS",
+                "Added backup DNS servers for redundancy",
+                success
+            );
+        }
+
+        return RepairAction(
+            "Add Backup DNS",
+            "Already have sufficient DNS servers",
+            true
+        );
+    }
+
+    /**
+     * Rollback all changes
+     */
+    void rollbackAll() @safe {
+        import std.range : retro;
+
+        // Rollback in reverse order
+        foreach (token; rollbackStack.retro) {
+            if (token.rollbackFunc !is null) {
+                token.rollbackFunc(token.platformData);
+            }
+        }
+
+        rollbackStack.length = 0;
+    }
+}
+
+struct RepairResult {
+    bool success;
+    RepairAction[] actions;
+}
+
+struct RepairAction {
+    string name;
+    string description;
+    bool success;
+}
+----
+
+=== Layer 5: Zig Low-Level Operations
+
+[source,zig]
+----
+// src/lowlevel/bpf.zig
+const std = @import("std");
+const linux = std.os.linux;
+
+/// BPF packet filter for network diagnostics
+pub const PacketFilter = struct {
+    fd: i32,
+
+    /// Create a BPF program to capture DNS packets
+    pub fn createDNSFilter(allocator: std.mem.Allocator) !PacketFilter {
+        // BPF program to filter UDP port 53 (DNS)
+        const bpf_insn = extern struct {
+            code: u16,
+            jt: u8,
+            jf: u8,
+            k: u32,
+        };
+
+        const prog = [_]bpf_insn{
+            // Load IP protocol
+            .{ .code = 0x30, .jt = 0, .jf = 0, .k = 9 }, // ldh [9]
+            // Check if UDP (17)
+            .{ .code = 0x15, .jt = 0, .jf = 3, .k = 17 }, // jeq #17, next, drop
+            // Load destination port
+            .{ .code = 0x28, .jt = 0, .jf = 0, .k = 2 }, // ldh [2]
+            // Check if port 53
+            .{ .code = 0x15, .jt = 0, .jf = 1, .k = 53 }, // jeq #53, accept, drop
+            // Accept packet
+            .{ .code = 0x06, .jt = 0, .jf = 0, .k = 0xFFFFFFFF }, // ret #-1
+            // Drop packet
+            .{ .code = 0x06, .jt = 0, .jf = 0, .k = 0 }, // ret #0
+        };
+
+        const fd = try std.os.socket(linux.AF.PACKET, linux.SOCK.RAW, 0);
+        errdefer std.os.close(fd);
+
+        // Attach BPF program
+        const SO_ATTACH_FILTER = 26;
+        const prog_ptr = @ptrCast([*]const bpf_insn, &prog);
+        try std.os.setsockopt(
+            fd,
+            linux.SOL.SOCKET,
+            SO_ATTACH_FILTER,
+            std.mem.sliceAsBytes(prog_ptr[0..prog.len]),
+        );
+
+        return PacketFilter{ .fd = fd };
+    }
+
+    /// Capture DNS packets for diagnostics
+    pub fn captureDNSPackets(self: *PacketFilter, allocator: std.mem.Allocator, timeout_ms: u32) ![]u8 {
+        var buffer = try allocator.alloc(u8, 65536);
+        errdefer allocator.free(buffer);
+
+        // Set receive timeout
+        const timeout = linux.timeval{
+            .tv_sec = @divFloor(timeout_ms, 1000),
+            .tv_usec = @rem(timeout_ms, 1000) * 1000,
+        };
+
+        try std.os.setsockopt(
+            self.fd,
+            linux.SOL.SOCKET,
+            linux.SO.RCVTIMEO,
+            std.mem.asBytes(&timeout),
+        );
+
+        const bytes_read = try std.os.read(self.fd, buffer);
+        return buffer[0..bytes_read];
+    }
+
+    pub fn close(self: *PacketFilter) void {
+        std.os.close(self.fd);
+    }
+};
+
+/// Export C-compatible interface for D
+export fn bpf_create_dns_filter() callconv(.C) i32 {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const filter = PacketFilter.createDNSFilter(gpa.allocator()) catch return -1;
+    return filter.fd;
+}
+
+export fn bpf_close_filter(fd: i32) callconv(.C) void {
+    std.os.close(fd);
+}
+----
+
+[source,zig]
+----
+// src/lowlevel/netlink.zig
+const std = @import("std");
+const linux = std.os.linux;
+
+/// Netlink interface for low-level network operations
+pub const Netlink = struct {
+    sock: i32,
+
+    pub fn init() !Netlink {
+        const sock = try std.os.socket(
+            linux.AF.NETLINK,
+            linux.SOCK.RAW,
+            linux.NETLINK.ROUTE,
+        );
+
+        // Bind to kernel
+        const addr = linux.sockaddr.nl{
+            .family = linux.AF.NETLINK,
+            .pad = 0,
+            .pid = 0, // Kernel
+            .groups = 0,
+        };
+
+        try std.os.bind(sock, @ptrCast(*const linux.sockaddr, &addr), @sizeOf(@TypeOf(addr)));
+
+        return Netlink{ .sock = sock };
+    }
+
+    /// Get all network interfaces
+    pub fn getInterfaces(self: *Netlink, allocator: std.mem.Allocator) ![]NetworkInterface {
+        // Send RTM_GETLINK request
+        const req = NetlinkRequest{
+            .nlh = .{
+                .len = @sizeOf(NetlinkRequest),
+                .type = linux.RTM.GETLINK,
+                .flags = linux.NLM_F_REQUEST | linux.NLM_F_DUMP,
+                .seq = 1,
+                .pid = std.os.linux.getpid(),
+            },
+            .ifinfo = .{
+                .family = linux.AF.UNSPEC,
+                .type = 0,
+                .index = 0,
+                .flags = 0,
+                .change = 0,
+            },
+        };
+
+        _ = try std.os.send(self.sock, std.mem.asBytes(&req), 0);
+
+        // Receive response
+        var buffer: [8192]u8 = undefined;
+        const bytes_read = try std.os.recv(self.sock, &buffer, 0);
+
+        var interfaces = std.ArrayList(NetworkInterface).init(allocator);
+        errdefer interfaces.deinit();
+
+        // Parse netlink messages
+        var offset: usize = 0;
+        while (offset < bytes_read) {
+            const nlh = @ptrCast(*const linux.nlmsghdr, &buffer[offset]);
+
+            if (nlh.type == linux.NLMSG_DONE) break;
+            if (nlh.type == linux.NLMSG_ERROR) return error.NetlinkError;
+
+            if (nlh.type == linux.RTM.NEWLINK) {
+                const ifinfo = @ptrCast(*const linux.ifinfomsg, &buffer[offset + @sizeOf(linux.nlmsghdr)]);
+
+                // Parse interface attributes
+                var netif = NetworkInterface{
+                    .index = ifinfo.index,
+                    .name = undefined,
+                    .is_up = (ifinfo.flags & linux.IFF_UP) != 0,
+                    .has_carrier = (ifinfo.flags & linux.IFF_RUNNING) != 0,
+                };
+
+                // Parse IFLA_* attributes for name, MAC, etc.
+                // (Simplified for example)
+
+                try interfaces.append(netif);
+            }
+
+            offset += std.mem.alignForward(nlh.len, 4);
+        }
+
+        return interfaces.toOwnedSlice();
+    }
+
+    pub fn close(self: *Netlink) void {
+        std.os.close(self.sock);
+    }
+};
+
+const NetlinkRequest = extern struct {
+    nlh: linux.nlmsghdr,
+    ifinfo: linux.ifinfomsg,
+};
+
+pub const NetworkInterface = struct {
+    index: i32,
+    name: [16]u8,
+    is_up: bool,
+    has_carrier: bool,
+};
+
+/// Export C-compatible interface for D
+export fn netlink_get_interfaces(out_count: *usize) callconv(.C) ?[*]NetworkInterface {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    var nl = Netlink.init() catch return null;
+    defer nl.close();
+
+    const interfaces = nl.getInterfaces(gpa.allocator()) catch return null;
+
+    out_count.* = interfaces.len;
+    return interfaces.ptr;
+}
+----
+
+== Module Structure
+
+=== Directory Layout
+
+----
+network-ambulance/
+├── dub.json                    # D package manifest
+├── build.zig                   # Zig build system
+├── src/
+│   ├── core/                   # D code
+│   │   ├── platform/
+│   │   │   ├── interfaces.d    # Platform abstraction interfaces
+│   │   │   ├── linux.d         # Linux implementation
+│   │   │   ├── darwin.d        # macOS implementation
+│   │   │   ├── windows.d       # Windows implementation (stub)
+│   │   │   ├── bsd.d           # BSD implementation
+│   │   │   └── factory.d       # Platform detection & factory
+│   │   ├── diagnostics/
+│   │   │   ├── dns.d           # DNS diagnostics
+│   │   │   ├── interfaces.d    # Interface diagnostics
+│   │   │   ├── routing.d       # Routing diagnostics
+│   │   │   ├── connectivity.d  # Connectivity tests
+│   │   │   └── package.d       # Module aggregator
+│   │   ├── repairs/
+│   │   │   ├── dns_repair.d    # DNS repair with rollback
+│   │   │   ├── interface_repair.d
+│   │   │   ├── routing_repair.d
+│   │   │   └── package.d
+│   │   └── cli/
+│   │       ├── commands.d      # CLI command handlers
+│   │       ├── output.d        # Formatted output
+│   │       └── main.d          # Entry point
+│   └── lowlevel/               # Zig code
+│       ├── bpf.zig             # BPF packet filtering
+│       ├── netlink.zig         # Netlink socket operations
+│       ├── sockets.zig         # Raw socket operations
+│       └── build.zig           # Zig library build
+├── tests/
+│   ├── unit/
+│   │   ├── dns_test.d
+│   │   ├── interface_test.d
+│   │   └── routing_test.d
+│   └── integration/
+│       ├── linux_test.d
+│       ├── darwin_test.d
+│       └── mock_platform.d     # Mock for platform-independent tests
+└── legacy/
+    └── network-ambulance.sh    # Original Bash script (for reference)
+----
+
+=== Platform Factory Pattern
+
+[source,d]
+----
+// src/core/platform/factory.d
+module core.platform.factory;
+
+import core.platform.interfaces;
+
+version(linux) {
+    import core.platform.linux;
+} else version(OSX) {
+    import core.platform.darwin;
+} else version(FreeBSD) {
+    import core.platform.bsd;
+} else version(Windows) {
+    import core.platform.windows;
+}
+
+/**
+ * Platform abstraction factory
+ * Automatically creates platform-specific implementations
+ */
+class PlatformFactory {
+    static INetworkInterface createNetworkInterface() @safe {
+        version(linux) {
+            return new LinuxNetworkInterface();
+        } else version(OSX) {
+            return new DarwinNetworkInterface();
+        } else version(FreeBSD) {
+            return new BSDNetworkInterface();
+        } else version(Windows) {
+            return new WindowsNetworkInterface();
+        } else {
+            static assert(false, "Unsupported platform");
+        }
+    }
+
+    static IDNSResolver createDNSResolver() @safe {
+        version(linux) {
+            return new LinuxDNSResolver();
+        } else version(OSX) {
+            return new DarwinDNSResolver();
+        } else version(FreeBSD) {
+            return new BSDDNSResolver();
+        } else version(Windows) {
+            return new WindowsDNSResolver();
+        } else {
+            static assert(false, "Unsupported platform");
+        }
+    }
+
+    static IRoutingTable createRoutingTable() @safe {
+        version(linux) {
+            return new LinuxRoutingTable();
+        } else version(OSX) {
+            return new DarwinRoutingTable();
+        } else version(FreeBSD) {
+            return new BSDRoutingTable();
+        } else version(Windows) {
+            return new WindowsRoutingTable();
+        } else {
+            static assert(false, "Unsupported platform");
+        }
+    }
+}
+----
+
+== CLI Interface
+
+[source,d]
+----
+// src/core/cli/main.d
+module core.cli.main;
+
+import core.platform.factory;
+import core.diagnostics;
+import core.repairs;
+import std.stdio;
+import std.getopt;
+
+void main(string[] args) {
+    bool autoRepair = false;
+    bool verbose = false;
+    string command = "diagnose";
+
+    auto helpInfo = getopt(
+        args,
+        "auto-repair|a", "Automatically attempt repairs", &autoRepair,
+        "verbose|v", "Verbose output", &verbose,
+        "command|c", "Command to run (diagnose, repair, status)", &command
+    );
+
+    if (helpInfo.helpWanted) {
+        defaultGetoptPrinter(
+            "Network Ambulance - Network diagnostics and repair tool\n" ~
+            "Usage: network-ambulance [options]\n",
+            helpInfo.options
+        );
+        return;
+    }
+
+    // Create platform-specific implementations
+    auto netif = PlatformFactory.createNetworkInterface();
+    auto dns = PlatformFactory.createDNSResolver();
+    auto routing = PlatformFactory.createRoutingTable();
+
+    switch (command) {
+        case "diagnose":
+            runDiagnostics(netif, dns, routing, verbose);
+            break;
+
+        case "repair":
+            runRepair(netif, dns, routing, verbose);
+            break;
+
+        case "status":
+            runStatus(netif, dns, routing, verbose);
+            break;
+
+        default:
+            writeln("Unknown command: ", command);
+            break;
+    }
+}
+
+void runDiagnostics(INetworkInterface netif, IDNSResolver dns, IRoutingTable routing, bool verbose) {
+    writeln("Running network diagnostics...\n");
+
+    // DNS diagnostics
+    auto dnsDiag = new DNSDiagnostics(dns);
+    auto dnsResult = dnsDiag.diagnose();
+
+    writeln("=== DNS Diagnostics ===");
+    writefln("Configured servers: %s", dnsResult.configuredServers.length);
+    writefln("Successful resolutions: %s/3", dnsResult.successfulResolutions);
+    writefln("Average query time: %s ms", dnsResult.averageQueryTime);
+    writefln("Status: %s", dnsResult.isHealthy ? "✓ Healthy" : "✗ Issues detected");
+
+    if (!dnsResult.isHealthy) {
+        auto issues = dnsDiag.identifyIssues();
+        writeln("\nIssues found:");
+        foreach (issue; issues) {
+            writefln("  [%s] %s", issue.severity, issue.description);
+        }
+    }
+
+    // Connectivity diagnostics
+    auto connDiag = new ConnectivityDiagnostics(netif, routing);
+    auto connResult = connDiag.diagnose();
+
+    writeln("\n=== Connectivity Diagnostics ===");
+    writefln("Active interfaces: %s", connResult.activeInterfaces.length);
+    writefln("Default gateway: %s", connResult.hasDefaultGateway ? "✓" : "✗");
+    writefln("Gateway reachable: %s", connResult.gatewayReachable ? "✓" : "✗");
+    writefln("Internet reachable: %s", connResult.internetReachable ? "✓" : "✗");
+    writefln("Status: %s", connResult.isHealthy ? "✓ Healthy" : "✗ Issues detected");
+}
+
+void runRepair(INetworkInterface netif, IDNSResolver dns, IRoutingTable routing, bool verbose) {
+    writeln("Diagnosing issues before repair...\n");
+
+    auto dnsDiag = new DNSDiagnostics(dns);
+    auto issues = dnsDiag.identifyIssues();
+
+    if (issues.length == 0) {
+        writeln("No issues detected. Network is healthy.");
+        return;
+    }
+
+    writeln("Issues found:");
+    foreach (issue; issues) {
+        writefln("  [%s] %s", issue.severity, issue.description);
+    }
+
+    writeln("\nAttempting repairs...");
+
+    auto repair = new DNSRepair(dns);
+    auto result = repair.repairDNS(issues);
+
+    writeln("\nRepair actions:");
+    foreach (action; result.actions) {
+        writefln("  %s %s: %s",
+            action.success ? "✓" : "✗",
+            action.name,
+            action.description
+        );
+    }
+
+    if (result.success) {
+        writeln("\n✓ Repair successful!");
+    } else {
+        writeln("\n✗ Repair failed. Changes rolled back.");
+    }
+}
+
+void runStatus(INetworkInterface netif, IDNSResolver dns, IRoutingTable routing, bool verbose) {
+    writeln("=== Network Status ===\n");
+
+    // Show interfaces
+    auto interfaces = netif.getInterfaces();
+    writeln("Interfaces:");
+    foreach (iface; interfaces) {
+        writefln("  %s: %s %s",
+            iface.name,
+            iface.isUp ? "UP" : "DOWN",
+            iface.hasCarrier ? "(connected)" : "(no carrier)"
+        );
+
+        if (verbose) {
+            auto status = netif.getStatus(iface.name);
+            writefln("    RX: %s bytes (%s errors)", status.rxBytes, status.rxErrors);
+            writefln("    TX: %s bytes (%s errors)", status.txBytes, status.txErrors);
+        }
+    }
+
+    // Show DNS
+    writeln("\nDNS Servers:");
+    auto servers = dns.getDNSServers();
+    foreach (server; servers) {
+        writefln("  %s", server.address);
+    }
+
+    // Show routes
+    writeln("\nDefault Gateway:");
+    try {
+        auto gateway = routing.getDefaultGateway();
+        writefln("  %s", gateway.address);
+    } catch (Exception e) {
+        writeln("  (none configured)");
+    }
+}
+----
+
+== Build System
+
+=== Dub Configuration
+
+[source,json]
+----
+{
+  "name": "network-ambulance",
+  "description": "Network diagnostics and repair tool",
+  "authors": ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"],
+  "license": "AGPL-3.0-or-later",
+  "targetType": "executable",
+  "targetPath": "bin",
+  "sourcePaths": ["src/core"],
+  "importPaths": ["src/core"],
+
+  "dependencies": {
+  },
+
+  "configurations": [
+    {
+      "name": "linux",
+      "platforms": ["linux"],
+      "versions": ["linux"],
+      "libs": ["z"],
+      "preBuildCommands": ["zig build -Doptimize=ReleaseFast"]
+    },
+    {
+      "name": "osx",
+      "platforms": ["osx"],
+      "versions": ["OSX"],
+      "preBuildCommands": ["zig build -Doptimize=ReleaseFast"]
+    },
+    {
+      "name": "freebsd",
+      "platforms": ["freebsd"],
+      "versions": ["FreeBSD"],
+      "preBuildCommands": ["zig build -Doptimize=ReleaseFast"]
+    }
+  ],
+
+  "buildTypes": {
+    "release": {
+      "buildOptions": ["releaseMode", "optimize", "inline"],
+      "dflags": ["-O3", "-release"]
+    },
+    "debug": {
+      "buildOptions": ["debugMode", "debugInfo"],
+      "dflags": ["-g", "-debug"]
+    }
+  }
+}
+----
+
+=== Zig Build Configuration
+
+[source,zig]
+----
+// build.zig
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    // Build Zig library for low-level operations
+    const lowlevel = b.addStaticLibrary(.{
+        .name = "lowlevel",
+        .root_source_file = .{ .path = "src/lowlevel/build.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // Export C symbols for D interop
+    lowlevel.addIncludePath(.{ .path = "include" });
+
+    b.installArtifact(lowlevel);
+
+    // Tests
+    const tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/lowlevel/netlink.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const run_tests = b.addRunArtifact(tests);
+    const test_step = b.step("test", "Run Zig tests");
+    test_step.dependOn(&run_tests.step);
+}
+----
+
+== Testing Strategy
+
+=== Unit Tests
+
+[source,d]
+----
+// tests/unit/dns_test.d
+module tests.unit.dns_test;
+
+import core.diagnostics.dns;
+import core.platform.interfaces;
+import std.stdio;
+
+/**
+ * Mock DNS resolver for testing
+ */
+class MockDNSResolver : IDNSResolver {
+    IPAddress[] mockServers;
+    DNSResult mockResult;
+
+    this(IPAddress[] servers, DNSResult result) @safe {
+        this.mockServers = servers;
+        this.mockResult = result;
+    }
+
+    IPAddress[] getDNSServers() @safe {
+        return mockServers;
+    }
+
+    DNSResult resolve(string hostname) @safe {
+        return mockResult;
+    }
+
+    bool setDNSServers(IPAddress[] servers, out RollbackToken token) @safe {
+        mockServers = servers;
+        return true;
+    }
+}
+
+unittest {
+    // Test healthy DNS
+    auto resolver = new MockDNSResolver(
+        [IPAddress("8.8.8.8", AddressFamily.IPv4, 0)],
+        DNSResult(true, [IPAddress("1.2.3.4", AddressFamily.IPv4, 0)], 50, "")
+    );
+
+    auto diag = new DNSDiagnostics(resolver);
+    auto result = diag.diagnose();
+
+    assert(result.isHealthy);
+    assert(result.successfulResolutions > 0);
+    assert(result.averageQueryTime < 500);
+
+    writeln("✓ DNS diagnostics test passed");
+}
+
+unittest {
+    // Test DNS failure
+    auto resolver = new MockDNSResolver(
+        [],
+        DNSResult(false, [], 0, "No DNS servers")
+    );
+
+    auto diag = new DNSDiagnostics(resolver);
+    auto issues = diag.identifyIssues();
+
+    assert(issues.length > 0);
+    assert(issues[0].type == DNSIssueType.NoConfiguredServers);
+
+    writeln("✓ DNS failure detection test passed");
+}
+----
+
+=== Integration Tests
+
+[source,d]
+----
+// tests/integration/linux_test.d
+version(linux):
+
+module tests.integration.linux_test;
+
+import core.platform.linux;
+import core.diagnostics;
+import std.stdio;
+
+unittest {
+    // Test real Linux network interface
+    auto netif = new LinuxNetworkInterface();
+    auto interfaces = netif.getInterfaces();
+
+    assert(interfaces.length > 0, "Should have at least loopback interface");
+
+    // Find loopback
+    bool hasLoopback = false;
+    foreach (iface; interfaces) {
+        if (iface.name == "lo") {
+            hasLoopback = true;
+            assert(iface.isUp, "Loopback should be up");
+            break;
+        }
+    }
+
+    assert(hasLoopback, "Should have loopback interface");
+
+    writeln("✓ Linux interface detection test passed");
+}
+
+unittest {
+    // Test DNS resolution on real system
+    auto resolver = new LinuxDNSResolver();
+    auto result = resolver.resolve("localhost");
+
+    assert(result.success, "localhost should resolve");
+    assert(result.addresses.length > 0, "Should have at least one address");
+
+    writeln("✓ Linux DNS resolution test passed");
+}
+----
+
+== Migration Path
+
+=== Phase 1: Core Infrastructure (Weeks 1-2)
+
+. Implement platform abstraction interfaces
+. Implement Linux platform (primary target)
+. Implement basic diagnostics (DNS, connectivity)
+. CLI for diagnostics only
+. Unit tests for all modules
+
+=== Phase 2: Repair Engine (Weeks 3-4)
+
+. Implement DNS repair with rollback
+. Implement interface repair
+. Implement routing repair
+. Integration tests on Linux
+
+=== Phase 3: Cross-Platform (Weeks 5-6)
+
+. Implement macOS platform
+. Implement BSD platform
+. Platform-specific tests
+. CI/CD for multi-platform builds
+
+=== Phase 4: Low-Level Operations (Weeks 7-8)
+
+. Implement Zig BPF module
+. Implement Zig netlink module
+. D/Zig interop testing
+. Performance optimization
+
+=== Phase 5: Migration & Deprecation (Weeks 9-10)
+
+. Feature parity with Bash version
+. Performance benchmarks
+. Documentation
+. Deprecate Bash version
+. Release v2.0
+
+=== Parallel Bash Compatibility
+
+During migration, maintain Bash wrapper:
+
+[source,bash]
+----
+#!/usr/bin/env bash
+# network-ambulance.sh - Legacy wrapper
+
+if command -v network-ambulance-d &>/dev/null; then
+    # Use D version if available
+    exec network-ambulance-d "$@"
+else
+    # Fallback to Bash implementation
+    # (existing script logic)
+    ...
+fi
+----
+
+== Performance Considerations
+
+=== Memory Management
+
+* Use `@nogc` for performance-critical paths
+* Pool allocations for repeated operations
+* Minimize GC pressure in diagnostics loop
+
+[source,d]
+----
+// Example: @nogc diagnostic function
+@nogc nothrow
+bool quickConnectivityCheck() {
+    import core.stdc.stdio : printf;
+
+    // Stack-only operations
+    // No heap allocations
+    // No exceptions
+
+    return true;
+}
+----
+
+=== Benchmarks
+
+Expected performance vs Bash:
+
+[cols="1,1,1"]
+|===
+| Operation | Bash | D + Zig
+
+| DNS diagnostics
+| ~500ms
+| ~50ms (10x faster)
+
+| Interface enumeration
+| ~100ms
+| ~5ms (20x faster)
+
+| Full diagnostic scan
+| ~2s
+| ~200ms (10x faster)
+
+| Repair with rollback
+| ~5s
+| ~500ms (10x faster)
+|===
+
+== Appendix: D Language Benefits for Network Tools
+
+=== Memory Safety
+
+[source,d]
+----
+// @safe prevents common vulnerabilities
+@safe void parseNetlinkMessage(ubyte[] data) {
+    // Compiler enforces:
+    // - No buffer overflows
+    // - No null pointer dereferences
+    // - No dangling pointers
+    // - No use-after-free
+}
+----
+
+=== C Interop
+
+[source,d]
+----
+// Direct C function calls
+extern(C) int ioctl(int fd, ulong request, void* argp);
+
+// Use C structs directly
+import core.sys.posix.net.if_;
+
+// Call Zig functions
+extern(C) int bpf_create_dns_filter();
+----
+
+=== Compile-Time Execution
+
+[source,d]
+----
+// Compute at compile time
+enum MAX_INTERFACES = computeMaxInterfaces();
+
+int computeMaxInterfaces() {
+    // This runs at compile time
+    return 256;
+}
+----
+
+=== Strong Typing
+
+[source,d]
+----
+// Type-safe network addresses
+struct IPv4Address {
+    ubyte[4] octets;
+
+    this(string addr) {
+        // Parse and validate at construction
+    }
+}
+
+// Compiler prevents mixing types
+IPv4Address ipv4 = ...;
+IPv6Address ipv6 = ipv4; // Compile error!
+----
+
+== Appendix: Cross-Compilation
+
+[source,bash]
+----
+# Build for Linux from macOS
+dub build --arch=x86_64-linux-gnu
+
+# Build for macOS from Linux
+dub build --arch=x86_64-apple-darwin
+
+# Zig makes cross-compilation trivial
+zig build -Dtarget=x86_64-linux-gnu
+zig build -Dtarget=aarch64-macos
+zig build -Dtarget=x86_64-windows-gnu
+----
+
+== Conclusion
+
+This architecture provides:
+
+* **Safety**: D's `@safe` and strong typing prevent entire classes of bugs
+* **Performance**: 10-20x faster than Bash, comparable to pure C
+* **Portability**: Single codebase for Linux, macOS, BSD, Windows
+* **Maintainability**: Clear module boundaries, comprehensive tests
+* **Extensibility**: Easy to add new diagnostics and repairs
+* **Gradual Migration**: Coexist with Bash during transition
+
+The D + Zig hybrid approach leverages the strengths of both languages:
+
+* D for safe, high-level logic
+* Zig for zero-cost low-level operations
+
+This combination delivers both safety and performance for a production-grade network diagnostic tool.

@@ -1,0 +1,1530 @@
+= Ada/SPARK Terminal User Interface Design
+Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>
+v1.0, 2026-01-29
+:toc: left
+:toclevels: 3
+:sectnums:
+:source-highlighter: rouge
+:icons: font
+:imagesdir: images
+:experimental:
+
+== Executive Summary
+
+This document specifies the design of a safety-critical Terminal User Interface (TUI) for Network Ambulance using Ada 2022 and SPARK formal verification. The TUI provides real-time network diagnostics, repair controls, and status monitoring with mathematically proven absence of runtime errors, memory safety, and correct state transitions.
+
+== Why Ada/SPARK for TUI?
+
+=== Safety Guarantees
+
+[cols="1,3"]
+|===
+| Property | Ada/SPARK Advantage
+
+| **Formal Verification**
+| SPARK can prove absence of runtime errors (buffer overflows, null dereferences, arithmetic overflow) at compile time
+
+| **Memory Safety**
+| Strong typing and ownership prevent use-after-free, dangling pointers, and memory leaks without garbage collection overhead
+
+| **Real-Time Responsiveness**
+| Deterministic execution without GC pauses; suitable for real-time network monitoring
+
+| **Concurrency Safety**
+| Protected types and Ravenscar profile ensure race-free concurrent UI updates
+
+| **Zero Undefined Behavior**
+| Language specification eliminates undefined behavior; erroneous execution is provably absent
+
+| **Cross-Platform**
+| GNAT compiler supports Linux, macOS, Windows, BSD with consistent behavior
+|===
+
+=== TUI-Specific Benefits
+
+* **No Unsafe Foreign Functions**: Terminal control via verified Ada bindings
+* **Bounded Buffers**: All UI data structures have compile-time size limits
+* **Proven State Machines**: View transitions formally verified
+* **Safe String Handling**: Ada strings prevent buffer overflows automatically
+* **Contract-Based Design**: Preconditions and postconditions enforced by compiler
+
+== Architecture
+
+=== Directory Structure
+
+----
+network-ambulance/
+└── tui/
+    ├── ada/
+    │   ├── network_ambulance_tui.gpr      # GPRbuild project file
+    │   ├── src/
+    │   │   ├── main.adb                   # Entry point
+    │   │   ├── views/
+    │   │   │   ├── dashboard_view.ads
+    │   │   │   ├── dashboard_view.adb
+    │   │   │   ├── diagnostic_view.ads
+    │   │   │   ├── diagnostic_view.adb
+    │   │   │   ├── repair_view.ads
+    │   │   │   ├── repair_view.adb
+    │   │   │   ├── help_view.ads
+    │   │   │   └── help_view.adb
+    │   │   ├── components/
+    │   │   │   ├── status_widget.ads
+    │   │   │   ├── status_widget.adb
+    │   │   │   ├── log_viewer.ads
+    │   │   │   ├── log_viewer.adb
+    │   │   │   ├── menu.ads
+    │   │   │   ├── menu.adb
+    │   │   │   ├── progress_bar.ads
+    │   │   │   └── progress_bar.adb
+    │   │   ├── bindings/
+    │   │   │   ├── ncurses_binding.ads    # C bindings
+    │   │   │   ├── terminal.ads           # Safe wrapper
+    │   │   │   └── terminal.adb
+    │   │   ├── core/
+    │   │   │   ├── event_loop.ads
+    │   │   │   ├── event_loop.adb
+    │   │   │   ├── state_machine.ads
+    │   │   │   ├── state_machine.adb
+    │   │   │   ├── ipc.ads                # Network Ambulance core IPC
+    │   │   │   ├── ipc.adb
+    │   │   │   ├── types.ads              # Common types
+    │   │   │   └── config.ads             # Compile-time config
+    │   │   └── utils/
+    │   │       ├── bounded_strings.ads
+    │   │       ├── bounded_strings.adb
+    │   │       ├── time_utils.ads
+    │   │       └── time_utils.adb
+    │   ├── spark/
+    │   │   └── proofs/                    # SPARK proof sessions
+    │   └── tests/
+    │       ├── unit/
+    │       └── integration/
+    └── docs/
+        └── this-document.adoc
+----
+
+=== Component Diagram
+
+----
+┌─────────────────────────────────────────────────────────┐
+│                      main.adb                           │
+│                   (Entry Point)                         │
+└────────────────────┬────────────────────────────────────┘
+                     │
+         ┌───────────▼───────────┐
+         │    Event Loop         │
+         │  (event_loop.ads)     │
+         └───┬───────────────┬───┘
+             │               │
+    ┌────────▼──────┐   ┌────▼─────────────┐
+    │ State Machine │   │   IPC Manager    │
+    │  (verified)   │   │ (core protocol)  │
+    └───┬───────────┘   └──────────────────┘
+        │
+        │ dispatches to
+        │
+    ┌───▼────────────────────────────────────┐
+    │          View Layer                    │
+    │  ┌──────────┬──────────┬──────────┐   │
+    │  │Dashboard │Diagnostic│  Repair  │   │
+    │  │   View   │   View   │   View   │   │
+    │  └────┬─────┴────┬─────┴────┬─────┘   │
+    └───────┼──────────┼──────────┼─────────┘
+            │          │          │
+            └──────────┴──────────┘
+                       │
+         ┌─────────────▼──────────────┐
+         │   Component Layer          │
+         │ ┌────────┬────────┬──────┐ │
+         │ │Status  │Log     │Menu  │ │
+         │ │Widget  │Viewer  │      │ │
+         │ └────┬───┴───┬────┴──┬───┘ │
+         └──────┼───────┼───────┼─────┘
+                │       │       │
+         ┌──────▼───────▼───────▼─────┐
+         │   Terminal Abstraction     │
+         │   (terminal.ads)           │
+         └────────────┬────────────────┘
+                      │
+         ┌────────────▼────────────────┐
+         │   ncurses C Bindings        │
+         │  (ncurses_binding.ads)      │
+         └─────────────────────────────┘
+----
+
+== UI Layout Specification
+
+=== Dashboard View (Default)
+
+----
+┌─ Network Ambulance v2.0 ─────────────────────────────────────────────┐
+│ [F1] Dashboard  [F2] Diagnostics  [F3] Repairs  [F4] Help  [Q] Quit  │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│ Network Status: 🟢 HEALTHY                                            │
+│ ┌─────────────┬─────────────┬─────────────┬─────────────────────┐   │
+│ │ Latency     │ DNS Status  │ Routes      │ Interfaces          │   │
+│ │ 12ms        │ ✓ OK        │ ✓ OK        │ 2 UP, 0 DOWN        │   │
+│ │ [████████░] │ 8.8.8.8     │ Default: OK │ eth0: UP, wlan0: UP │   │
+│ └─────────────┴─────────────┴─────────────┴─────────────────────┘   │
+│                                                                       │
+│ Recent Activity:                                         [↑] [↓] Scroll
+│ ┌────────────────────────────────────────────────────────────────┐  │
+│ │ [16:30:45] Diagnostic completed - no issues found             │  │
+│ │ [16:25:12] DHCP lease renewed on eth0 (192.168.1.100)        │  │
+│ │ [16:20:33] DNS switched to 8.8.8.8 (12ms faster)             │  │
+│ │ [16:15:01] Interface wlan0 connected to "HomeNetwork"        │  │
+│ │ [16:10:22] Background scan completed - all systems nominal   │  │
+│ └────────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│ Quick Actions:                                                        │
+│   [D] Run Diagnostics    [R] Repair Issues    [T] Test Connectivity │
+│   [L] View Logs          [S] Settings         [Q] Quit              │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+Status: Ready │ CPU: 2% │ Memory: 45MB │ Uptime: 2h 15m
+----
+
+=== Diagnostic View
+
+----
+┌─ Network Diagnostics ─────────────────────────────────────────────────┐
+│ [F1] Dashboard  [F2] Diagnostics  [F3] Repairs  [F4] Help  [Q] Quit  │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│ Running Comprehensive Network Diagnostics...                          │
+│                                                                       │
+│ ✓ DNS Resolution             [████████████████████] 100%  (12/12)    │
+│ ✓ Interface Configuration    [████████████████████] 100%  (2/2)      │
+│ ✓ Routing Table              [████████████████████] 100%  (15/15)    │
+│ ⟳ Latency Tests              [████████████░░░░░░░]  65%   (13/20)    │
+│ ○ Bandwidth Test             [░░░░░░░░░░░░░░░░░░░]   0%   (0/1)      │
+│ ○ TCP/UDP Port Checks        [░░░░░░░░░░░░░░░░░░░]   0%   (0/50)     │
+│                                                                       │
+│ Current Test: Latency to 1.1.1.1                                     │
+│ ┌────────────────────────────────────────────────────────────────┐  │
+│ │ Ping 1.1.1.1...                                                │  │
+│ │ 64 bytes from 1.1.1.1: icmp_seq=1 ttl=56 time=11.2 ms         │  │
+│ │ 64 bytes from 1.1.1.1: icmp_seq=2 ttl=56 time=10.8 ms         │  │
+│ │ 64 bytes from 1.1.1.1: icmp_seq=3 ttl=56 time=11.5 ms         │  │
+│ └────────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│ Issues Detected: 0                                                    │
+│                                                                       │
+│ [C] Cancel Diagnostics    [V] View Full Report    [R] Repair Issues  │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+Status: Running diagnostics... │ CPU: 8% │ Memory: 52MB │ ETA: 45s
+----
+
+=== Repair View
+
+----
+┌─ Network Repair ──────────────────────────────────────────────────────┐
+│ [F1] Dashboard  [F2] Diagnostics  [F3] Repairs  [F4] Help  [Q] Quit  │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│ Detected Issues (3):                                                  │
+│                                                                       │
+│ [●] 1. Slow DNS Resolution (Current: 45ms, Expected: <20ms)          │
+│     Recommended Fix: Switch to faster DNS (1.1.1.1 or 8.8.8.8)       │
+│     Impact: Low risk, immediate improvement                          │
+│     [ ] Apply this fix                                               │
+│                                                                       │
+│ [●] 2. Duplicate Default Route                                        │
+│     Recommended Fix: Remove redundant route via 192.168.1.254        │
+│     Impact: Medium risk, may temporarily disrupt connectivity        │
+│     [✓] Apply this fix                                               │
+│                                                                       │
+│ [ ] 3. MTU Mismatch on wlan0 (Current: 1500, Optimal: 1492)         │
+│     Recommended Fix: Adjust MTU to 1492 for PPPoE compatibility      │
+│     Impact: Low risk, may improve performance                        │
+│     [ ] Apply this fix                                               │
+│                                                                       │
+│ Selected: 1 repair(s)                                                │
+│                                                                       │
+│ [Space] Toggle Selection    [A] Select All    [N] Select None        │
+│ [Enter] Apply Selected      [C] Cancel        [D] Show Details       │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+Status: Ready to repair │ Selected: 1/3 │ Estimated time: <5s
+----
+
+=== Help View (Context-Sensitive)
+
+----
+┌─ Help: Dashboard View ────────────────────────────────────────────────┐
+│ [F1] Dashboard  [F2] Diagnostics  [F3] Repairs  [F4] Help  [Q] Quit  │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│ Dashboard View                                                        │
+│ ══════════════                                                        │
+│                                                                       │
+│ The Dashboard provides real-time monitoring of your network status.  │
+│                                                                       │
+│ Status Indicators:                                                    │
+│   🟢 HEALTHY   - All systems operational                             │
+│   🟡 WARNING   - Minor issues detected, no critical problems         │
+│   🔴 CRITICAL  - Major issues affecting connectivity                 │
+│   ⚪ UNKNOWN   - Unable to determine status                          │
+│                                                                       │
+│ Keyboard Shortcuts:                                                   │
+│   [D]         Run full network diagnostics                           │
+│   [R]         Go to repair view (if issues detected)                 │
+│   [T]         Test connectivity to common services                   │
+│   [L]         View detailed activity logs                            │
+│   [S]         Open settings and configuration                        │
+│   [F2]        Switch to Diagnostics view                             │
+│   [F3]        Switch to Repairs view                                 │
+│   [F4]        Show this help screen                                  │
+│   [Q] or Esc  Quit Network Ambulance TUI                             │
+│   [↑] [↓]     Scroll through activity log                            │
+│                                                                       │
+│ [PgUp] [PgDn] Navigate Help    [Esc] Close Help                      │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+----
+
+== Core Type Definitions
+
+=== types.ads - Common Types
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Ada.Strings.Bounded;
+with Ada.Real_Time;
+
+package Network_Ambulance.TUI.Types with
+   SPARK_Mode => On
+is
+   -- Maximum string lengths (compile-time bounded)
+   Max_Status_Length      : constant := 128;
+   Max_Log_Entry_Length   : constant := 256;
+   Max_Log_Entries        : constant := 1000;
+   Max_Interface_Name_Len : constant := 16;
+   Max_IP_Address_Len     : constant := 45;  -- IPv6 max length
+
+   -- Bounded strings for safety
+   package Status_Strings is new Ada.Strings.Bounded.Generic_Bounded_Length
+      (Max => Max_Status_Length);
+   use Status_Strings;
+
+   package Log_Strings is new Ada.Strings.Bounded.Generic_Bounded_Length
+      (Max => Max_Log_Entry_Length);
+
+   package Interface_Strings is new Ada.Strings.Bounded.Generic_Bounded_Length
+      (Max => Max_Interface_Name_Len);
+
+   package IP_Strings is new Ada.Strings.Bounded.Generic_Bounded_Length
+      (Max => Max_IP_Address_Len);
+
+   -- Network health status
+   type Health_Status is (Unknown, Healthy, Warning, Critical)
+      with Default_Value => Unknown;
+
+   -- View states
+   type View_State is (Dashboard, Diagnostics, Repairs, Help, Exiting)
+      with Default_Value => Dashboard;
+
+   -- Keyboard input
+   type Key_Code is new Integer range -1 .. 65535;
+   Key_Escape   : constant Key_Code := 27;
+   Key_F1       : constant Key_Code := 265;  -- ncurses KEY_F(1)
+   Key_F2       : constant Key_Code := 266;
+   Key_F3       : constant Key_Code := 267;
+   Key_F4       : constant Key_Code := 268;
+   Key_Up       : constant Key_Code := 259;  -- ncurses KEY_UP
+   Key_Down     : constant Key_Code := 258;  -- ncurses KEY_DOWN
+   Key_Enter    : constant Key_Code := 10;
+   Key_Space    : constant Key_Code := 32;
+   Key_Error    : constant Key_Code := -1;
+
+   -- Network status metrics
+   type Latency_Ms is range 0 .. 10_000
+      with Default_Value => 0;
+
+   type Interface_Count is range 0 .. 128
+      with Default_Value => 0;
+
+   type Route_Count is range 0 .. 1024
+      with Default_Value => 0;
+
+   -- Interface status
+   type Interface_State is (Down, Up, Unknown)
+      with Default_Value => Unknown;
+
+   type Interface_Info is record
+      Name       : Interface_Strings.Bounded_String;
+      State      : Interface_State;
+      IP_Address : IP_Strings.Bounded_String;
+   end record;
+
+   type Interface_Array is array (Positive range <>) of Interface_Info;
+
+   -- Log entry
+   type Log_Level is (Debug, Info, Warning, Error)
+      with Default_Value => Info;
+
+   type Log_Entry is record
+      Timestamp : Ada.Real_Time.Time;
+      Level     : Log_Level;
+      Message   : Log_Strings.Bounded_String;
+   end record;
+
+   -- Circular buffer for logs
+   type Log_Buffer is record
+      Entries : array (1 .. Max_Log_Entries) of Log_Entry;
+      Head    : Positive := 1;
+      Tail    : Positive := 1;
+      Count   : Natural := 0;
+   end record;
+
+   -- Diagnostic test status
+   type Test_Status is (Pending, Running, Passed, Failed, Skipped)
+      with Default_Value => Pending;
+
+   type Test_Result is record
+      Name        : Status_Strings.Bounded_String;
+      Status      : Test_Status;
+      Progress    : Natural range 0 .. 100 := 0;
+      Completed   : Natural := 0;
+      Total       : Positive := 1;
+   end record;
+
+   type Test_Suite is array (Positive range <>) of Test_Result;
+
+   -- Repair action
+   type Repair_Severity is (Low, Medium, High, Critical)
+      with Default_Value => Low;
+
+   type Repair_Action is record
+      ID          : Positive;
+      Description : Status_Strings.Bounded_String;
+      Fix_Desc    : Status_Strings.Bounded_String;
+      Severity    : Repair_Severity;
+      Selected    : Boolean := False;
+      Applied     : Boolean := False;
+   end record;
+
+   type Repair_List is array (Positive range <>) of Repair_Action;
+
+end Network_Ambulance.TUI.Types;
+----
+
+=== state_machine.ads - Verified State Transitions
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Network_Ambulance.TUI.Types; use Network_Ambulance.TUI.Types;
+
+package Network_Ambulance.TUI.State_Machine with
+   SPARK_Mode => On
+is
+   -- State machine for view transitions
+   type TUI_State is private;
+
+   -- Initialize state machine
+   procedure Initialize (State : out TUI_State)
+   with
+      Post => Get_Current_View (State) = Dashboard;
+
+   -- Get current view
+   function Get_Current_View (State : TUI_State) return View_State
+   with
+      Post => Get_Current_View'Result in View_State;
+
+   -- Transition to new view
+   procedure Transition_To (State : in out TUI_State; New_View : View_State)
+   with
+      Pre  => New_View in View_State,
+      Post => Get_Current_View (State) = New_View;
+
+   -- Handle keyboard input and transition if needed
+   procedure Handle_Key (State : in out TUI_State; Key : Key_Code)
+   with
+      Pre => Key in Key_Code;
+
+   -- Check if state machine requests exit
+   function Should_Exit (State : TUI_State) return Boolean
+   with
+      Post => (if Should_Exit'Result then Get_Current_View (State) = Exiting);
+
+private
+   type TUI_State is record
+      Current_View : View_State := Dashboard;
+      Previous_View : View_State := Dashboard;
+   end record;
+
+end Network_Ambulance.TUI.State_Machine;
+----
+
+=== state_machine.adb - Implementation with Proofs
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+package body Network_Ambulance.TUI.State_Machine with
+   SPARK_Mode => On
+is
+
+   procedure Initialize (State : out TUI_State) is
+   begin
+      State.Current_View := Dashboard;
+      State.Previous_View := Dashboard;
+   end Initialize;
+
+   function Get_Current_View (State : TUI_State) return View_State is
+      (State.Current_View);
+
+   procedure Transition_To (State : in out TUI_State; New_View : View_State) is
+   begin
+      State.Previous_View := State.Current_View;
+      State.Current_View := New_View;
+   end Transition_To;
+
+   procedure Handle_Key (State : in out TUI_State; Key : Key_Code) is
+      Current : constant View_State := State.Current_View;
+   begin
+      -- Global keys
+      case Key is
+         when Key_F1 =>
+            Transition_To (State, Dashboard);
+         when Key_F2 =>
+            Transition_To (State, Diagnostics);
+         when Key_F3 =>
+            Transition_To (State, Repairs);
+         when Key_F4 =>
+            Transition_To (State, Help);
+         when Key_Escape =>
+            -- Escape from Help returns to previous view
+            if Current = Help then
+               Transition_To (State, State.Previous_View);
+            else
+               Transition_To (State, Exiting);
+            end if;
+         when Character'Pos ('q') | Character'Pos ('Q') =>
+            Transition_To (State, Exiting);
+         when others =>
+            -- View-specific keys handled by view code
+            null;
+      end case;
+   end Handle_Key;
+
+   function Should_Exit (State : TUI_State) return Boolean is
+      (State.Current_View = Exiting);
+
+end Network_Ambulance.TUI.State_Machine;
+----
+
+== Terminal Abstraction Layer
+
+=== ncurses_binding.ads - C Bindings
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (Off);  -- FFI not verifiable
+
+with Interfaces.C; use Interfaces.C;
+with Interfaces.C.Strings;
+
+package Network_Ambulance.TUI.NCurses_Binding is
+   -- Thin binding to ncurses C library
+
+   type WINDOW is new System.Address;
+
+   -- Initialize ncurses
+   function initscr return WINDOW
+      with Import, Convention => C, External_Name => "initscr";
+
+   function endwin return int
+      with Import, Convention => C, External_Name => "endwin";
+
+   -- Window operations
+   function newwin (nlines, ncols, begin_y, begin_x : int) return WINDOW
+      with Import, Convention => C, External_Name => "newwin";
+
+   function delwin (win : WINDOW) return int
+      with Import, Convention => C, External_Name => "delwin";
+
+   -- Output
+   function wprintw (win : WINDOW; fmt : Interfaces.C.Strings.chars_ptr;
+                     args : System.Address) return int
+      with Import, Convention => C, External_Name => "wprintw";
+
+   function mvwprintw (win : WINDOW; y, x : int;
+                       fmt : Interfaces.C.Strings.chars_ptr) return int
+      with Import, Convention => C, External_Name => "mvwprintw";
+
+   function waddch (win : WINDOW; ch : unsigned) return int
+      with Import, Convention => C, External_Name => "waddch";
+
+   -- Input
+   function wgetch (win : WINDOW) return int
+      with Import, Convention => C, External_Name => "wgetch";
+
+   function nodelay (win : WINDOW; bf : unsigned_char) return int
+      with Import, Convention => C, External_Name => "nodelay";
+
+   function keypad (win : WINDOW; bf : unsigned_char) return int
+      with Import, Convention => C, External_Name => "keypad";
+
+   -- Refresh
+   function wrefresh (win : WINDOW) return int
+      with Import, Convention => C, External_Name => "wrefresh";
+
+   function wclear (win : WINDOW) return int
+      with Import, Convention => C, External_Name => "wclear";
+
+   -- Colors
+   function start_color return int
+      with Import, Convention => C, External_Name => "start_color";
+
+   function init_pair (pair, f, b : short) return int
+      with Import, Convention => C, External_Name => "init_pair";
+
+   function wattron (win : WINDOW; attrs : int) return int
+      with Import, Convention => C, External_Name => "wattron";
+
+   function wattroff (win : WINDOW; attrs : int) return int
+      with Import, Convention => C, External_Name => "wattroff";
+
+   -- Box drawing
+   function box (win : WINDOW; verch, horch : unsigned) return int
+      with Import, Convention => C, External_Name => "box";
+
+   -- Constants
+   COLOR_BLACK   : constant := 0;
+   COLOR_RED     : constant := 1;
+   COLOR_GREEN   : constant := 2;
+   COLOR_YELLOW  : constant := 3;
+   COLOR_BLUE    : constant := 4;
+   COLOR_MAGENTA : constant := 5;
+   COLOR_CYAN    : constant := 6;
+   COLOR_WHITE   : constant := 7;
+
+   A_NORMAL      : constant := 0;
+   A_BOLD        : constant := 2097152;
+   A_REVERSE     : constant := 262144;
+
+end Network_Ambulance.TUI.NCurses_Binding;
+----
+
+=== terminal.ads - Safe Wrapper
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Network_Ambulance.TUI.Types; use Network_Ambulance.TUI.Types;
+
+package Network_Ambulance.TUI.Terminal with
+   SPARK_Mode => On
+is
+   -- Safe, verified terminal abstraction
+
+   type Color_Pair is range 1 .. 64;
+
+   -- Terminal dimensions
+   type Row_Number is range 1 .. 200;
+   type Column_Number is range 1 .. 300;
+
+   subtype Row_Range is Row_Number range 1 .. 100;
+   subtype Column_Range is Column_Number range 1 .. 200;
+
+   -- Initialize terminal (must be called first)
+   procedure Initialize
+   with
+      Post => Is_Initialized;
+
+   -- Cleanup terminal (must be called before exit)
+   procedure Finalize
+   with
+      Pre => Is_Initialized;
+
+   -- Check initialization status
+   function Is_Initialized return Boolean;
+
+   -- Get terminal dimensions
+   procedure Get_Size (Rows : out Row_Number; Cols : out Column_Number)
+   with
+      Pre  => Is_Initialized,
+      Post => Rows in Row_Number and Cols in Column_Number;
+
+   -- Clear screen
+   procedure Clear
+   with
+      Pre => Is_Initialized;
+
+   -- Move cursor
+   procedure Move_Cursor (Row : Row_Number; Col : Column_Number)
+   with
+      Pre => Is_Initialized;
+
+   -- Print string at current position
+   procedure Print (Text : String)
+   with
+      Pre => Is_Initialized and Text'Length <= 1024;
+
+   -- Print string at specific position
+   procedure Print_At (Row : Row_Number; Col : Column_Number; Text : String)
+   with
+      Pre => Is_Initialized and Text'Length <= 1024;
+
+   -- Print with color
+   procedure Print_Colored (Text : String; Color : Color_Pair)
+   with
+      Pre => Is_Initialized and Text'Length <= 1024;
+
+   -- Draw box
+   procedure Draw_Box (Top_Row, Left_Col, Height, Width : Positive)
+   with
+      Pre => Is_Initialized;
+
+   -- Draw progress bar
+   procedure Draw_Progress_Bar
+      (Row, Col, Width : Positive; Progress : Natural range 0 .. 100)
+   with
+      Pre => Is_Initialized and Width >= 10;
+
+   -- Get keyboard input (non-blocking)
+   procedure Get_Key (Key : out Key_Code)
+   with
+      Pre  => Is_Initialized,
+      Post => Key in Key_Code;
+
+   -- Refresh display
+   procedure Refresh
+   with
+      Pre => Is_Initialized;
+
+private
+   Initialized : Boolean := False;
+
+end Network_Ambulance.TUI.Terminal;
+----
+
+== Component Specifications
+
+=== status_widget.ads - Network Status Display
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Network_Ambulance.TUI.Types; use Network_Ambulance.TUI.Types;
+with Network_Ambulance.TUI.Terminal; use Network_Ambulance.TUI.Terminal;
+
+package Network_Ambulance.TUI.Components.Status_Widget with
+   SPARK_Mode => On
+is
+   -- Widget for displaying network status summary
+
+   type Status_Widget_Type is private;
+
+   -- Initialize widget
+   procedure Initialize
+      (Widget : out Status_Widget_Type;
+       Row    : Row_Number;
+       Col    : Column_Number;
+       Width  : Positive)
+   with
+      Post => Is_Initialized (Widget);
+
+   -- Update status
+   procedure Update_Health
+      (Widget : in out Status_Widget_Type;
+       Status : Health_Status)
+   with
+      Pre  => Is_Initialized (Widget),
+      Post => Get_Health (Widget) = Status;
+
+   procedure Update_Latency
+      (Widget  : in out Status_Widget_Type;
+       Latency : Latency_Ms)
+   with
+      Pre  => Is_Initialized (Widget),
+      Post => Get_Latency (Widget) = Latency;
+
+   procedure Update_Interface_Count
+      (Widget : in out Status_Widget_Type;
+       Up_Count, Down_Count : Interface_Count)
+   with
+      Pre  => Is_Initialized (Widget);
+
+   -- Render widget
+   procedure Render (Widget : Status_Widget_Type)
+   with
+      Pre => Is_Initialized (Widget) and Terminal.Is_Initialized;
+
+   -- Getters
+   function Is_Initialized (Widget : Status_Widget_Type) return Boolean;
+   function Get_Health (Widget : Status_Widget_Type) return Health_Status
+   with
+      Pre => Is_Initialized (Widget);
+   function Get_Latency (Widget : Status_Widget_Type) return Latency_Ms
+   with
+      Pre => Is_Initialized (Widget);
+
+private
+   type Status_Widget_Type is record
+      Initialized  : Boolean := False;
+      Row          : Row_Number := 1;
+      Col          : Column_Number := 1;
+      Width        : Positive := 80;
+      Health       : Health_Status := Unknown;
+      Latency      : Latency_Ms := 0;
+      DNS_OK       : Boolean := False;
+      Routes_OK    : Boolean := False;
+      Up_Ifaces    : Interface_Count := 0;
+      Down_Ifaces  : Interface_Count := 0;
+   end record;
+
+end Network_Ambulance.TUI.Components.Status_Widget;
+----
+
+=== log_viewer.ads - Scrollable Log Display
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Network_Ambulance.TUI.Types; use Network_Ambulance.TUI.Types;
+with Network_Ambulance.TUI.Terminal; use Network_Ambulance.TUI.Terminal;
+
+package Network_Ambulance.TUI.Components.Log_Viewer with
+   SPARK_Mode => On
+is
+   -- Scrollable log viewer widget
+
+   type Log_Viewer_Type is private;
+
+   -- Initialize viewer
+   procedure Initialize
+      (Viewer : out Log_Viewer_Type;
+       Row    : Row_Number;
+       Col    : Column_Number;
+       Width  : Positive;
+       Height : Positive)
+   with
+      Post => Is_Initialized (Viewer);
+
+   -- Add log entry
+   procedure Add_Entry
+      (Viewer : in out Log_Viewer_Type;
+       Entry_Data : Log_Entry)
+   with
+      Pre => Is_Initialized (Viewer);
+
+   -- Scroll controls
+   procedure Scroll_Up (Viewer : in out Log_Viewer_Type)
+   with
+      Pre => Is_Initialized (Viewer);
+
+   procedure Scroll_Down (Viewer : in out Log_Viewer_Type)
+   with
+      Pre => Is_Initialized (Viewer);
+
+   procedure Scroll_To_Bottom (Viewer : in out Log_Viewer_Type)
+   with
+      Pre => Is_Initialized (Viewer);
+
+   -- Render viewer
+   procedure Render (Viewer : Log_Viewer_Type)
+   with
+      Pre => Is_Initialized (Viewer) and Terminal.Is_Initialized;
+
+   -- Getters
+   function Is_Initialized (Viewer : Log_Viewer_Type) return Boolean;
+   function Get_Entry_Count (Viewer : Log_Viewer_Type) return Natural
+   with
+      Pre => Is_Initialized (Viewer);
+
+private
+   type Log_Viewer_Type is record
+      Initialized   : Boolean := False;
+      Row           : Row_Number := 1;
+      Col           : Column_Number := 1;
+      Width         : Positive := 80;
+      Height        : Positive := 10;
+      Log_Buffer    : Types.Log_Buffer;
+      Scroll_Offset : Natural := 0;
+      Auto_Scroll   : Boolean := True;
+   end record;
+
+end Network_Ambulance.TUI.Components.Log_Viewer;
+----
+
+== IPC Protocol
+
+=== ipc.ads - Communication with Network Ambulance Core
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Network_Ambulance.TUI.Types; use Network_Ambulance.TUI.Types;
+
+package Network_Ambulance.TUI.IPC with
+   SPARK_Mode => On
+is
+   -- IPC with Network Ambulance D core via Unix domain socket
+
+   type IPC_Handle is private;
+
+   -- Message types
+   type Message_Type is
+      (Get_Status, Run_Diagnostics, Apply_Repair, Subscribe_Events);
+
+   type Status_Response is record
+      Health       : Health_Status;
+      Latency      : Latency_Ms;
+      DNS_OK       : Boolean;
+      Routes_OK    : Boolean;
+      Up_Ifaces    : Interface_Count;
+      Down_Ifaces  : Interface_Count;
+   end record;
+
+   type Event_Type is (Status_Changed, Diagnostic_Progress, Repair_Complete);
+
+   type Event_Message is record
+      Event_Kind : Event_Type;
+      Timestamp  : Ada.Real_Time.Time;
+      Data       : Status_Strings.Bounded_String;
+   end record;
+
+   -- Connect to core daemon
+   procedure Connect (Handle : out IPC_Handle; Socket_Path : String)
+   with
+      Pre  => Socket_Path'Length > 0 and Socket_Path'Length <= 256,
+      Post => Is_Connected (Handle);
+
+   -- Disconnect
+   procedure Disconnect (Handle : in out IPC_Handle)
+   with
+      Pre  => Is_Connected (Handle),
+      Post => not Is_Connected (Handle);
+
+   -- Send message to core
+   procedure Send_Message
+      (Handle  : in out IPC_Handle;
+       Msg     : Message_Type)
+   with
+      Pre => Is_Connected (Handle);
+
+   -- Receive status response
+   procedure Receive_Status
+      (Handle   : in out IPC_Handle;
+       Response : out Status_Response;
+       Success  : out Boolean)
+   with
+      Pre => Is_Connected (Handle);
+
+   -- Poll for events (non-blocking)
+   procedure Poll_Events
+      (Handle  : in out IPC_Handle;
+       Event   : out Event_Message;
+       Has_Event : out Boolean)
+   with
+      Pre => Is_Connected (Handle);
+
+   -- Getters
+   function Is_Connected (Handle : IPC_Handle) return Boolean;
+
+private
+   type IPC_Handle is record
+      Connected    : Boolean := False;
+      Socket_FD    : Integer := -1;
+      Last_Error   : Status_Strings.Bounded_String;
+   end record;
+
+end Network_Ambulance.TUI.IPC;
+----
+
+== Event Loop
+
+=== event_loop.ads - Main Loop
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Network_Ambulance.TUI.State_Machine;
+with Network_Ambulance.TUI.IPC;
+with Network_Ambulance.TUI.Types; use Network_Ambulance.TUI.Types;
+
+package Network_Ambulance.TUI.Event_Loop with
+   SPARK_Mode => On
+is
+   -- Main event loop for TUI
+
+   type Loop_Handle is private;
+
+   -- Initialize event loop
+   procedure Initialize
+      (Handle      : out Loop_Handle;
+       IPC_Socket  : String)
+   with
+      Pre  => IPC_Socket'Length > 0 and IPC_Socket'Length <= 256,
+      Post => Is_Initialized (Handle);
+
+   -- Run main loop (blocks until exit)
+   procedure Run (Handle : in out Loop_Handle)
+   with
+      Pre => Is_Initialized (Handle);
+
+   -- Cleanup
+   procedure Finalize (Handle : in out Loop_Handle)
+   with
+      Pre  => Is_Initialized (Handle),
+      Post => not Is_Initialized (Handle);
+
+   -- Getters
+   function Is_Initialized (Handle : Loop_Handle) return Boolean;
+
+private
+   type Loop_Handle is record
+      Initialized   : Boolean := False;
+      State         : State_Machine.TUI_State;
+      IPC           : IPC.IPC_Handle;
+      Running       : Boolean := False;
+   end record;
+
+end Network_Ambulance.TUI.Event_Loop;
+----
+
+=== event_loop.adb - Implementation
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Network_Ambulance.TUI.Terminal;
+with Network_Ambulance.TUI.Views.Dashboard_View;
+with Ada.Real_Time; use Ada.Real_Time;
+
+package body Network_Ambulance.TUI.Event_Loop with
+   SPARK_Mode => On
+is
+
+   procedure Initialize
+      (Handle      : out Loop_Handle;
+       IPC_Socket  : String)
+   is
+   begin
+      State_Machine.Initialize (Handle.State);
+      IPC.Connect (Handle.IPC, IPC_Socket);
+      Handle.Initialized := True;
+      Handle.Running := False;
+   end Initialize;
+
+   procedure Run (Handle : in out Loop_Handle) is
+      Key : Key_Code;
+      Next_Refresh : Time := Clock;
+      Refresh_Period : constant Time_Span := Milliseconds (100);  -- 10 Hz
+
+      Status : IPC.Status_Response;
+      Success : Boolean;
+      Event : IPC.Event_Message;
+      Has_Event : Boolean;
+   begin
+      Terminal.Initialize;
+      Handle.Running := True;
+
+      while not State_Machine.Should_Exit (Handle.State) loop
+         -- Handle keyboard input
+         Terminal.Get_Key (Key);
+         if Key /= Key_Error then
+            State_Machine.Handle_Key (Handle.State, Key);
+         end if;
+
+         -- Poll IPC events
+         IPC.Poll_Events (Handle.IPC, Event, Has_Event);
+         if Has_Event then
+            -- Process event (update state based on event type)
+            null;  -- View-specific event handling
+         end if;
+
+         -- Periodic status update
+         if Clock >= Next_Refresh then
+            IPC.Send_Message (Handle.IPC, IPC.Get_Status);
+            IPC.Receive_Status (Handle.IPC, Status, Success);
+            Next_Refresh := Clock + Refresh_Period;
+         end if;
+
+         -- Render current view
+         Terminal.Clear;
+         case State_Machine.Get_Current_View (Handle.State) is
+            when Dashboard =>
+               Views.Dashboard_View.Render (Status);
+            when Diagnostics =>
+               null;  -- Views.Diagnostic_View.Render
+            when Repairs =>
+               null;  -- Views.Repair_View.Render
+            when Help =>
+               null;  -- Views.Help_View.Render
+            when Exiting =>
+               null;
+         end case;
+         Terminal.Refresh;
+
+         -- Small delay to avoid busy-waiting
+         delay until Clock + Milliseconds (50);
+      end loop;
+
+      Terminal.Finalize;
+      Handle.Running := False;
+   end Run;
+
+   procedure Finalize (Handle : in out Loop_Handle) is
+   begin
+      if Handle.Running then
+         Handle.Running := False;
+      end if;
+      IPC.Disconnect (Handle.IPC);
+      Handle.Initialized := False;
+   end Finalize;
+
+   function Is_Initialized (Handle : Loop_Handle) return Boolean is
+      (Handle.Initialized);
+
+end Network_Ambulance.TUI.Event_Loop;
+----
+
+== Main Entry Point
+
+=== main.adb
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+pragma SPARK_Mode (On);
+
+with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Command_Line; use Ada.Command_Line;
+with Network_Ambulance.TUI.Event_Loop;
+
+procedure Main is
+   Loop_Handle : Network_Ambulance.TUI.Event_Loop.Loop_Handle;
+   Socket_Path : constant String := "/var/run/network-ambulance/daemon.sock";
+begin
+   Put_Line ("Network Ambulance TUI v2.0");
+   Put_Line ("Connecting to daemon...");
+
+   begin
+      Network_Ambulance.TUI.Event_Loop.Initialize (Loop_Handle, Socket_Path);
+      Network_Ambulance.TUI.Event_Loop.Run (Loop_Handle);
+      Network_Ambulance.TUI.Event_Loop.Finalize (Loop_Handle);
+   exception
+      when others =>
+         Put_Line ("Error: Failed to connect to Network Ambulance daemon");
+         Put_Line ("Ensure daemon is running: systemctl status network-ambulance");
+         Set_Exit_Status (Failure);
+   end;
+
+   Put_Line ("Goodbye!");
+end Main;
+----
+
+== Build System
+
+=== network_ambulance_tui.gpr - GPRbuild Project
+
+[source,ada]
+----
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell
+
+project Network_Ambulance_TUI is
+
+   for Languages use ("Ada");
+   for Source_Dirs use ("src/**");
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Main use ("main.adb");
+
+   type Build_Type is ("debug", "release", "spark");
+   Build : Build_Type := external ("BUILD", "debug");
+
+   package Compiler is
+      Common_Switches := ("-gnat2022", "-gnatwa", "-gnatwe", "-gnatyyM");
+
+      case Build is
+         when "debug" =>
+            for Default_Switches ("Ada") use Common_Switches &
+               ("-g", "-O0", "-gnata", "-gnatVa");
+         when "release" =>
+            for Default_Switches ("Ada") use Common_Switches &
+               ("-O2", "-gnatn", "-fdata-sections", "-ffunction-sections");
+         when "spark" =>
+            for Default_Switches ("Ada") use Common_Switches &
+               ("-g", "-O0", "-gnata", "-gnatd.F");
+      end case;
+   end Compiler;
+
+   package Binder is
+      for Default_Switches ("Ada") use ("-Es");
+   end Binder;
+
+   package Linker is
+      for Default_Switches ("Ada") use ("-lncurses", "-lpthread");
+
+      case Build is
+         when "release" =>
+            for Default_Switches ("Ada") use Linker'Default_Switches ("Ada") &
+               ("-Wl,--gc-sections", "-s");
+         when others =>
+            null;
+      end case;
+   end Linker;
+
+   package Prove is
+      for Proof_Switches ("Ada") use
+         ("--level=4", "--prover=cvc5,z3,altergo", "--timeout=30",
+          "--steps=10000", "--warnings=error");
+   end Prove;
+
+   package Builder is
+      for Executable ("main.adb") use "network-ambulance-tui";
+   end Builder;
+
+end Network_Ambulance_TUI;
+----
+
+== SPARK Verification
+
+=== Running SPARK Proofs
+
+[source,bash]
+----
+# Full SPARK analysis and proof
+gnatprove -P network_ambulance_tui.gpr --level=4 --report=all
+
+# Specific package
+gnatprove -P network_ambulance_tui.gpr -u state_machine.adb
+
+# Generate proof report
+gnatprove -P network_ambulance_tui.gpr --output=oneline --report=statistics
+----
+
+=== Expected Proof Results
+
+|===
+| Package | Flow Analysis | Proof Obligations | Expected Result
+
+| `types.ads`
+| N/A (spec only)
+| 0
+| ✓ Verified
+
+| `state_machine.ads/adb`
+| ✓ No uninitialized vars
+| 12 (range checks, preconditions)
+| ✓ All proven
+
+| `terminal.ads`
+| ✓ No uninitialized vars
+| 8 (preconditions, string length)
+| ✓ All proven
+
+| `status_widget.ads/adb`
+| ✓ No uninitialized vars
+| 15 (preconditions, postconditions)
+| ✓ All proven
+
+| `log_viewer.ads/adb`
+| ✓ No uninitialized vars
+| 18 (preconditions, buffer bounds)
+| ✓ All proven
+
+| `ipc.ads`
+| ✓ No uninitialized vars
+| 10 (preconditions, string length)
+| ⚠ Partial (socket I/O unverified)
+
+| `event_loop.ads/adb`
+| ✓ No uninitialized vars
+| 20 (preconditions, loop invariants)
+| ✓ All proven
+|===
+
+=== Proof Annotations Example
+
+[source,ada]
+----
+procedure Add_Entry
+   (Viewer : in out Log_Viewer_Type;
+    Entry_Data : Log_Entry)
+with
+   Pre  => Is_Initialized (Viewer),
+   Post => Get_Entry_Count (Viewer) <= Max_Log_Entries
+is
+   Buffer : Types.Log_Buffer renames Viewer.Log_Buffer;
+begin
+   -- Add to circular buffer
+   Buffer.Entries (Buffer.Head) := Entry_Data;
+
+   -- Increment head with wraparound
+   if Buffer.Head = Max_Log_Entries then
+      Buffer.Head := 1;
+   else
+      Buffer.Head := Buffer.Head + 1;
+   end if;
+
+   -- Update count (capped at max)
+   if Buffer.Count < Max_Log_Entries then
+      Buffer.Count := Buffer.Count + 1;
+      pragma Assert (Buffer.Count <= Max_Log_Entries);  -- Proven by range
+   end if;
+
+   -- Auto-scroll if enabled
+   if Viewer.Auto_Scroll then
+      Scroll_To_Bottom (Viewer);
+   end if;
+end Add_Entry;
+----
+
+== Platform Support
+
+=== Linux (Full Features)
+
+* **ncurses**: Installed via `libncurses-dev` (Debian/Ubuntu) or `ncurses-devel` (Fedora/RHEL)
+* **Terminal**: All modern terminals supported (GNOME Terminal, Konsole, xterm, Alacritty)
+* **Unicode**: Full UTF-8 support for status indicators
+* **256 Colors**: All color pairs available
+
+=== macOS
+
+* **ncurses**: Included with Xcode Command Line Tools
+* **Terminal**: Terminal.app, iTerm2, Alacritty
+* **Limitations**: Some UTF-8 glyphs may render differently
+* **Build**: Use GNAT Community or FSF GCC
+
+=== Windows
+
+* **ncurses**: Via MinGW-w64 or WSL2
+* **Terminal**: Windows Terminal (recommended), mintty (MSYS2/Cygwin)
+* **Limitations**:
+  - Box-drawing characters may need fallback ASCII
+  - Color support varies by terminal
+* **Build**: GNAT Community Edition for Windows
+
+=== BSD (FreeBSD, OpenBSD, NetBSD)
+
+* **ncurses**: Installed via pkg or ports
+* **Terminal**: xterm, rxvt-unicode, Alacritty
+* **Full Features**: Same as Linux
+
+=== Terminal Detection
+
+[source,ada]
+----
+with Ada.Environment_Variables;
+
+function Detect_Terminal_Capabilities return Terminal_Caps is
+   Term : constant String := Ada.Environment_Variables.Value ("TERM");
+begin
+   if Term = "dumb" or Term = "unknown" then
+      return (Colors => False, Unicode => False, Mouse => False);
+   elsif Contains (Term, "256color") then
+      return (Colors => True, Unicode => True, Mouse => True);
+   else
+      return (Colors => True, Unicode => False, Mouse => False);
+   end if;
+end Detect_Terminal_Capabilities;
+----
+
+== Testing Strategy
+
+=== Unit Tests
+
+[source,ada]
+----
+-- tests/unit/test_state_machine.adb
+with AUnit.Assertions; use AUnit.Assertions;
+with Network_Ambulance.TUI.State_Machine;
+
+procedure Test_State_Machine is
+   State : State_Machine.TUI_State;
+begin
+   -- Test initialization
+   State_Machine.Initialize (State);
+   Assert (State_Machine.Get_Current_View (State) = Dashboard,
+           "Initial view should be Dashboard");
+
+   -- Test F2 key transitions to Diagnostics
+   State_Machine.Handle_Key (State, Key_F2);
+   Assert (State_Machine.Get_Current_View (State) = Diagnostics,
+           "F2 should switch to Diagnostics view");
+
+   -- Test Escape from Help returns to previous
+   State_Machine.Transition_To (State, Help);
+   State_Machine.Handle_Key (State, Key_Escape);
+   Assert (State_Machine.Get_Current_View (State) = Diagnostics,
+           "Escape from Help should return to previous view");
+
+   -- Test Q key exits
+   State_Machine.Handle_Key (State, Character'Pos ('Q'));
+   Assert (State_Machine.Should_Exit (State),
+           "Q key should trigger exit");
+end Test_State_Machine;
+----
+
+=== Integration Tests
+
+* Mock IPC daemon that responds with test data
+* Automated keyboard input simulation
+* Terminal output capture and verification
+* Performance tests (render time < 16ms for 60 FPS)
+
+=== SPARK Proofs as Tests
+
+SPARK proofs themselves act as tests:
+* Precondition violations caught at compile time
+* Postcondition failures indicate bugs
+* Flow analysis ensures no uninitialized reads
+* Range checks proven eliminate runtime errors
+
+== Build and Installation
+
+=== Build Commands
+
+[source,bash]
+----
+# Debug build
+gprbuild -P network_ambulance_tui.gpr -XBUILD=debug
+
+# Release build (optimized)
+gprbuild -P network_ambulance_tui.gpr -XBUILD=release
+
+# SPARK mode (verification)
+gprbuild -P network_ambulance_tui.gpr -XBUILD=spark
+gnatprove -P network_ambulance_tui.gpr --level=4
+
+# Clean
+gprclean -P network_ambulance_tui.gpr
+
+# Install
+sudo install -m 755 bin/network-ambulance-tui /usr/local/bin/
+----
+
+=== Dependencies
+
+|===
+| Dependency | Version | Purpose
+
+| GNAT
+| ≥ 12.0
+| Ada compiler with SPARK support
+
+| GPRbuild
+| ≥ 22.0
+| Build system
+
+| SPARK
+| ≥ 23.0
+| Formal verification
+
+| ncurses
+| ≥ 6.0
+| Terminal UI library
+
+| GNATprove
+| ≥ 13.0
+| SPARK prover
+
+| CVC5 / Z3
+| Latest
+| SMT solvers for SPARK
+|===
+
+=== Runtime Requirements
+
+* Network Ambulance daemon running (`network-ambulance` D service)
+* Unix domain socket at `/var/run/network-ambulance/daemon.sock`
+* Terminal with ≥ 80×24 characters (recommended: 100×30)
+* UTF-8 locale for proper glyph rendering
+
+== Future Enhancements
+
+=== Planned Features
+
+1. **Mouse Support**: Click to navigate, scroll with wheel
+2. **Themes**: Light/dark mode, customizable color schemes
+3. **Plugins**: Extensible view system for custom diagnostics
+4. **Remote Access**: Connect to daemon on remote host via SSH tunnel
+5. **Multi-Panel**: Split-screen for simultaneous views
+6. **Chart Widgets**: Real-time latency graphs using ASCII art
+7. **Export**: Save diagnostic reports to file
+
+=== SPARK Extensions
+
+* **Ravenscar Profile**: Concurrent UI updates with proven task safety
+* **Ghost Code**: Additional proof obligations for complex algorithms
+* **Information Flow**: Prove no secret data leaks to terminal
+* **Timing Analysis**: WCET (Worst-Case Execution Time) for real-time constraints
+
+== Conclusion
+
+The Ada/SPARK TUI for Network Ambulance provides:
+
+* ✓ **Safety**: Formally verified absence of runtime errors
+* ✓ **Security**: Memory-safe, no undefined behavior
+* ✓ **Responsiveness**: Real-time performance without GC pauses
+* ✓ **Maintainability**: Strong typing prevents entire classes of bugs
+* ✓ **Portability**: Cross-platform terminal support
+* ✓ **Reliability**: Critical network operations with proven correctness
+
+By leveraging SPARK formal verification, we achieve safety-critical quality suitable for production network operations where failures have real consequences.
+
+== References
+
+* Ada Reference Manual: https://ada-lang.io/docs/arm
+* SPARK User's Guide: https://docs.adacore.com/spark2014-docs/html/ug/
+* ncurses Programming Guide: https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
+* GNATprove Documentation: https://docs.adacore.com/gnatprove-docs/html/ug/
+* AdaCore GNAT User's Guide: https://docs.adacore.com/gnat-docs/html/gnat_ugn/
+
+---
+
+Document ID: NA-TUI-DESIGN-001 +
+Status: Draft +
+Last Updated: 2026-01-29 +
+Author: Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>
