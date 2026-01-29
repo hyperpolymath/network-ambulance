@@ -17,6 +17,7 @@ import core.diagnostics.connectivity;
 import core.repairs.dns_repair;
 import core.repairs.interface_repair;
 import core.repairs.routing_repair;
+import core.output.json_output;
 
 /// CLI commands
 enum Command {
@@ -79,7 +80,7 @@ int main(string[] args) {
         // Execute command
         final switch (command) {
             case Command.Diagnose:
-                return runDiagnose(verbose);
+                return runDiagnose(verbose, jsonOutput);
             case Command.Repair:
                 // Parse repair target
                 if (args.length < 3) {
@@ -87,7 +88,7 @@ int main(string[] args) {
                     writeln("Usage: network-ambulance-d repair <dns|interface|routing|all>");
                     return 1;
                 }
-                return runRepair(args[2], verbose);
+                return runRepair(args[2], verbose, jsonOutput);
             case Command.Status:
                 return runStatus();
             case Command.Version:
@@ -104,16 +105,34 @@ int main(string[] args) {
 }
 
 /// Run full diagnostics
-int runDiagnose(bool verbose) {
+int runDiagnose(bool verbose, bool jsonOutput) {
+    auto platform = getPlatform();
+
+    // DNS Diagnostics
+    auto dnsDiag = diagnoseDNS(platform);
+
+    // Routing Diagnostics
+    auto routeDiag = diagnoseRouting(platform);
+
+    // Connectivity Diagnostics
+    auto connDiag = diagnoseConnectivity(platform);
+
+    // Interface Diagnostics
+    auto ifaceDiag = diagnoseInterfaces(platform);
+
+    // JSON output mode
+    if (jsonOutput) {
+        writeln(diagnosticsToJSON(dnsDiag, routeDiag, connDiag, ifaceDiag));
+        return 0;
+    }
+
+    // Human-readable output
     writeln("Network Ambulance - D lang prototype");
     writeln("=====================================\n");
-
-    auto platform = getPlatform();
     writeln("Platform: ", platform.getPlatformName(), "\n");
 
     // DNS Diagnostics
     writeln("=== DNS Diagnostics ===");
-    auto dnsDiag = diagnoseDNS(platform);
 
     if (dnsDiag.hasDNSServers) {
         writeln("✓ DNS servers configured: ", dnsDiag.servers.length);
@@ -153,7 +172,6 @@ int runDiagnose(bool verbose) {
 
     // Routing Diagnostics
     writeln("=== Routing Diagnostics ===");
-    auto routeDiag = diagnoseRouting(platform);
 
     if (routeDiag.hasDefaultRoute) {
         writeln("✓ Default route configured: ", routeDiag.defaultRoutes.length);
@@ -197,7 +215,6 @@ int runDiagnose(bool verbose) {
 
     // Connectivity Diagnostics
     writeln("=== Connectivity Diagnostics ===");
-    auto connDiag = diagnoseConnectivity(platform);
 
     foreach (test; connDiag.tests) {
         string status = test.reachable ? "✓" : "✗";
@@ -234,7 +251,6 @@ int runDiagnose(bool verbose) {
 
     // Interface Diagnostics
     writeln("=== Interface Diagnostics ===");
-    auto ifaceDiag = diagnoseInterfaces(platform);
 
     writeln("Total interfaces: ", ifaceDiag.interfaces.length);
     writeln("UP interfaces: ", ifaceDiag.upInterfaces.length);
@@ -295,7 +311,7 @@ int runVersion() {
 }
 
 /// Run repair procedure
-int runRepair(string target, bool verbose) {
+int runRepair(string target, bool verbose, bool jsonOutput) {
     version(Posix) {
         import core.sys.posix.unistd : getuid;
     }
@@ -332,17 +348,44 @@ int runRepair(string target, bool verbose) {
             return 1;
     }
 
+    // Perform repairs
+    DNSRepairResult dnsResult;
+    InterfaceRepairResult ifaceResult;
+    RoutingRepairResult routingResult;
+
+    // DNS repair
+    if (repairTarget == RepairTarget.DNS || repairTarget == RepairTarget.All) {
+        auto dnsDiag = diagnoseDNS(platform);
+        dnsResult = repairDNS(platform, dnsDiag);
+    }
+
+    // Interface repair
+    if (repairTarget == RepairTarget.Interface || repairTarget == RepairTarget.All) {
+        auto ifaceDiag = diagnoseInterfaces(platform);
+        ifaceResult = repairInterfaces(platform, ifaceDiag);
+    }
+
+    // Routing repair
+    if (repairTarget == RepairTarget.Routing || repairTarget == RepairTarget.All) {
+        auto routeDiag = diagnoseRouting(platform);
+        routingResult = repairRouting(platform, routeDiag);
+    }
+
+    // JSON output mode
+    if (jsonOutput) {
+        writeln(repairToJSON(dnsResult, ifaceResult, routingResult));
+        return (dnsResult.success || ifaceResult.success || routingResult.success) ? 0 : 1;
+    }
+
+    // Human-readable output
     writeln("Network Ambulance - Repair Mode");
     writeln("================================\n");
 
     bool anyRepaired = false;
 
-    // DNS repair
+    // DNS repair output
     if (repairTarget == RepairTarget.DNS || repairTarget == RepairTarget.All) {
         writeln("=== DNS Repair ===");
-
-        auto dnsDiag = diagnoseDNS(platform);
-        auto dnsResult = repairDNS(platform, dnsDiag);
 
         if (dnsResult.backupCreated) {
             writeln("✓ Backup created: ", dnsResult.backupPath);
@@ -364,12 +407,9 @@ int runRepair(string target, bool verbose) {
         }
     }
 
-    // Interface repair
+    // Interface repair output
     if (repairTarget == RepairTarget.Interface || repairTarget == RepairTarget.All) {
         writeln("=== Interface Repair ===");
-
-        auto ifaceDiag = diagnoseInterfaces(platform);
-        auto ifaceResult = repairInterfaces(platform, ifaceDiag);
 
         foreach (action; ifaceResult.actions) {
             writeln("  ", action);
@@ -396,38 +436,35 @@ int runRepair(string target, bool verbose) {
         }
     }
 
-    // Routing repair
+    // Routing repair output
     if (repairTarget == RepairTarget.Routing || repairTarget == RepairTarget.All) {
         writeln("=== Routing Repair ===");
 
-        auto routeDiag = diagnoseRouting(platform);
-        auto routeResult = repairRouting(platform, routeDiag);
-
-        foreach (action; routeResult.actions) {
+        foreach (action; routingResult.actions) {
             writeln("  ", action);
         }
 
-        foreach (error; routeResult.errors) {
+        foreach (error; routingResult.errors) {
             writeln("  ✗ ", error);
         }
 
-        if (routeResult.addedRoutes.length > 0) {
+        if (routingResult.addedRoutes.length > 0) {
             writeln("\nAdded routes:");
-            foreach (route; routeResult.addedRoutes) {
+            foreach (route; routingResult.addedRoutes) {
                 writefln("  %s via %s dev %s",
                         route.destination, route.gateway, route.interfaceName);
             }
         }
 
-        if (routeResult.removedRoutes.length > 0) {
+        if (routingResult.removedRoutes.length > 0) {
             writeln("\nRemoved routes:");
-            foreach (route; routeResult.removedRoutes) {
+            foreach (route; routingResult.removedRoutes) {
                 writefln("  %s via %s dev %s",
                         route.destination, route.gateway, route.interfaceName);
             }
         }
 
-        if (routeResult.success) {
+        if (routingResult.success) {
             writeln("✓ Routing repair completed\n");
             anyRepaired = true;
         } else {
