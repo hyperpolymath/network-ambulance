@@ -15,6 +15,7 @@ import core.diagnostics.interfaces;
 import core.diagnostics.routing;
 import core.diagnostics.connectivity;
 import core.repairs.dns_repair;
+import core.repairs.interface_repair;
 
 /// CLI commands
 enum Command {
@@ -362,10 +363,36 @@ int runRepair(string target, bool verbose) {
         }
     }
 
-    // Interface repair (placeholder)
+    // Interface repair
     if (repairTarget == RepairTarget.Interface || repairTarget == RepairTarget.All) {
         writeln("=== Interface Repair ===");
-        writeln("  Interface repair not yet implemented\n");
+
+        auto ifaceDiag = diagnoseInterfaces(platform);
+        auto ifaceResult = repairInterfaces(platform, ifaceDiag);
+
+        foreach (action; ifaceResult.actions) {
+            writeln("  ", action);
+        }
+
+        foreach (error; ifaceResult.errors) {
+            writeln("  ✗ ", error);
+        }
+
+        if (ifaceResult.success) {
+            if (ifaceResult.repairedInterfaces.length > 0) {
+                writeln("\nRepaired interfaces:");
+                foreach (iface; ifaceResult.repairedInterfaces) {
+                    writefln("  %s: %s, IP: %s",
+                            iface.name,
+                            iface.isUp ? "UP" : "DOWN",
+                            iface.ipv4Addresses.length > 0 ? iface.ipv4Addresses[0] : "None");
+                }
+            }
+            writeln("✓ Interface repair completed\n");
+            anyRepaired = true;
+        } else {
+            writeln("✗ Interface repair failed\n");
+        }
     }
 
     // Routing repair (placeholder)
