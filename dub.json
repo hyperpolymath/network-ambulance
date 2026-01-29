@@ -1,0 +1,61 @@
+{
+    "name": "network-ambulance",
+    "description": "Network diagnostics and repair for Linux",
+    "authors": ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"],
+    "copyright": "Copyright © 2026, Hyperpolymath",
+    "license": "PMPL-1.0-or-later",
+    "version": "1.1.0-alpha",
+
+    "targetType": "executable",
+    "targetName": "network-ambulance-d",
+    "targetPath": "bin",
+    "mainSourceFile": "src/d/cli/main.d",
+
+    "sourcePaths": ["src/d"],
+    "importPaths": ["src/d"],
+
+    "buildTypes": {
+        "release": {
+            "buildOptions": ["releaseMode", "optimize", "inline"],
+            "dflags": ["-mcpu=native"]
+        },
+        "debug": {
+            "buildOptions": ["debugMode", "debugInfo"],
+            "dflags": ["-vgc", "-checkaction=context"]
+        },
+        "safe": {
+            "buildOptions": ["releaseMode", "optimize", "inline"],
+            "dflags": ["-dip1000", "-preview=dip1021"]
+        }
+    },
+
+    "configurations": [
+        {
+            "name": "linux",
+            "platforms": ["linux"],
+            "versions": ["Linux"]
+        },
+        {
+            "name": "darwin",
+            "platforms": ["osx"],
+            "versions": ["OSX"]
+        },
+        {
+            "name": "windows",
+            "platforms": ["windows"],
+            "versions": ["Windows"]
+        },
+        {
+            "name": "bsd",
+            "platforms": ["freebsd", "openbsd", "netbsd"],
+            "versions": ["BSD"]
+        }
+    ],
+
+    "dependencies": {},
+
+    "toolchainRequirements": {
+        "dmd": ">=2.105.0",
+        "ldc": ">=1.35.0"
+    }
+}
