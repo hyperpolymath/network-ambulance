@@ -1,361 +1,865 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
-= Netowrk Ambulance - Roadmap
-:author: Hyperpolymath
-:toc: macro
-:toclevels: 2
+= Network Ambulance Roadmap
+:author: Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>
+:toc:
+:toclevels: 3
 :icons: font
 
-Development roadmap and future enhancements for Complete Linux Internet Repair.
+Strategic roadmap for Network Ambulance development, focused on the path to v1.2.
 
 toc::[]
 
-== Current State (v1.0.0)
+== Vision
 
-=== Implemented Features
+Network Ambulance aims to be **the definitive Linux network repair tool** that:
 
-==== Diagnostic Modules
+* Works reliably across all major distributions
+* Provides expert-level diagnostics to everyday users
+* Repairs common issues safely with full auditability
+* Integrates seamlessly with the AmbientOps ecosystem
+* Requires no networking expertise to use effectively
 
-[cols="1,1,3"]
+== Current Status: v1.0.0 ✓
+
+Released: January 2026
+
+v1.0.0 is **production-ready** with comprehensive diagnostic and repair capabilities.
+
+=== What v1.0 Delivers
+
+==== Complete Diagnostic Coverage
+
+[cols="2,1,4"]
 |===
-|Module |Status |Capabilities
+|Module |Lines of Code |Capabilities
 
-|*DNS Diagnostics*
-|Complete
-|resolv.conf validation, systemd-resolved status, DNS server testing, resolution verification, cache statistics
+|**DNS Diagnostics**
+|~250
+|`resolv.conf` validation, systemd-resolved inspection, DNS server reachability, resolution tests, cache statistics
 
-|*Interface Diagnostics*
-|Complete
-|Interface enumeration, status checking, IP/MAC display, link state, driver info, statistics, conflict detection
+|**Interface Diagnostics**
+|~280
+|Interface enumeration, status checks, IP/MAC display, link state detection, driver info, statistics, conflict detection
 
-|*Routing Diagnostics*
-|Complete
-|Default route validation, gateway reachability, IPv6 routing, policy rules, metric analysis, ARP table
+|**Routing Diagnostics**
+|~240
+|Default route validation, gateway reachability, IPv6 routing, policy rules, metric analysis, ARP table inspection
 
-|*Connectivity Diagnostics*
-|Complete
-|Ping tests (IP & DNS), HTTP/HTTPS verification, port connectivity, MTU discovery, latency measurement
+|**Connectivity Diagnostics**
+|~300
+|ICMP ping tests, HTTP/HTTPS verification, port connectivity, MTU path discovery, latency measurement
 
-|*Firewall Diagnostics*
-|Complete
-|iptables rules, nftables rules, UFW status, firewalld zones, policy analysis
+|**Firewall Diagnostics**
+|~220
+|iptables/nftables rules analysis, UFW status, firewalld zones, policy inspection
 
-|*NetworkManager Diagnostics*
-|Complete
-|Service status, connections, devices, connectivity state, configuration, conflict detection
-|===
-
-==== Repair Modules
-
-[cols="1,1,3"]
-|===
-|Module |Status |Capabilities
-
-|*DNS Repairs*
-|Complete
-|Create/fix resolv.conf, add DNS servers, reset to defaults, restart systemd-resolved, flush cache, configure NM DNS
-
-|*Interface Repairs*
-|Complete
-|Bring up interfaces, restart interfaces, renew DHCP, reset to DHCP, repair down interfaces
-
-|*Routing Repairs*
-|Complete
-|Add default route, remove duplicates, repair gateway, flush & rebuild routing table
-
-|*NetworkManager Repairs*
-|Complete
-|Restart service, reconnect connections, enable interface management, resolve conflicts, reset connections
+|**NetworkManager Diagnostics**
+|~260
+|Service status, connection states, device management, connectivity checks, conflict detection
 |===
 
-==== Utilities
+Total diagnostic LOC: ~1,550
 
-[cols="1,1,3"]
+==== Robust Repair Modules
+
+[cols="2,1,4"]
 |===
-|Utility |Status |Capabilities
+|Module |Lines of Code |Capabilities
 
-|*Logging*
-|Complete
-|Multi-level (DEBUG-FATAL), file output, colored console, section headers
+|**DNS Repairs**
+|~340
+|Create/repair `resolv.conf`, add reliable DNS servers, reset to defaults, restart systemd-resolved, flush caches, configure NetworkManager DNS
 
-|*Colors*
-|Complete
-|Auto-detection, force enable/disable, full color palette
+|**Interface Repairs**
+|~290
+|Bring interfaces up, restart interfaces, renew DHCP leases, reset to DHCP, repair down interfaces systematically
 
-|*Privileges*
-|Complete
-|Root detection, sudo management, privilege elevation, session keepalive
+|**Routing Repairs**
+|~310
+|Add default routes, remove duplicates, repair gateway configuration, flush and rebuild routing tables
 
-|*Backup*
-|Complete
-|Timestamped backups, restore functionality, retention policies, backup listing
-
-|*System Detection*
-|Complete
-|Distribution detection, family grouping, network manager detection, interface utilities
+|**NetworkManager Repairs**
+|~380
+|Restart service gracefully, reconnect connections, enable interface management, resolve manager conflicts, reset problematic connections
 |===
 
-==== Core Features
+Total repair LOC: ~1,320
 
-[cols="1,1"]
+==== Core Infrastructure
+
+[cols="2,1,4"]
 |===
-|Feature |Status
+|Component |Lines of Code |Features
 
-|CLI with 12+ commands
-|Complete
+|**Logging System**
+|~180
+|Multi-level logging (DEBUG→FATAL), file output, colored console, section headers, timestamps
 
-|Interactive guided mode
-|Complete
+|**Color Management**
+|~90
+|TTY detection, force enable/disable, full 16-color palette, graceful degradation
 
-|Dry-run mode
-|Complete
+|**Privilege Handling**
+|~140
+|Root detection, sudo elevation, session keepalive, privilege checks per operation
 
-|Auto-repair mode
-|Complete
+|**Backup System**
+|~160
+|Timestamped backups, restore functionality, retention policies, backup inventory
 
-|Verbose/quiet modes
-|Complete
-
-|File logging
-|Complete
-
-|Multi-distribution support
-|Complete
-
-|Installation script
-|Complete
-
-|Uninstallation script
-|Complete
-
-|Test suite
-|Complete
+|**System Detection**
+|~200
+|Distribution detection (Ubuntu/Debian/Fedora/Arch/SUSE), family grouping, network manager identification, interface utilities
 |===
 
-== Phase 2: Enhanced Diagnostics
+Total infrastructure LOC: ~770
 
-=== Wireless-Specific Diagnostics
+==== User Experience
 
-* Signal strength analysis and recommendations
-* Channel interference detection
-* WiFi authentication troubleshooting
-* WPA supplicant diagnostics
-* Hidden network detection
+* 12+ CLI commands covering all operations
+* Interactive guided mode (ask before each change)
+* Dry-run mode (preview without applying)
+* Auto-repair mode (fix everything automatically)
+* Verbose/quiet output modes
+* Comprehensive help system
+* Installation/uninstallation scripts
+* Cross-distribution support
 
-=== VPN Diagnostics
+**Total v1.0 codebase: ~3,640 lines of production Bash**
 
-* OpenVPN connection status
-* WireGuard tunnel verification
-* IPSec/IKEv2 diagnostics
-* VPN routing table analysis
-* Split-tunnel verification
+== Roadmap to v1.2
 
-=== Proxy & Captive Portal
+=== v1.1 Release (Q1 2026)
 
-* HTTP/SOCKS proxy detection
-* Captive portal identification
-* Proxy authentication testing
-* PAC file validation
+Target: **March 2026**
 
-=== Hardware Diagnostics
+v1.1 focuses on **wireless networking, VPN support, and diagnostics polish**.
 
-* Network card driver status
-* Firmware version checking
-* Hardware error detection
-* PCI/USB device enumeration
-* ethtool statistics integration
+==== Wireless-Specific Diagnostics
 
-== Phase 3: Advanced Repairs
+**Goal:** Make Network Ambulance the go-to tool for WiFi problems.
 
-=== Wireless Repairs
+Implementation (estimated 350 LOC):
 
-* WiFi reconnection procedures
-* WPA supplicant restart
-* Network rescan trigger
-* Power management fixes
+* `src/diagnostics/wireless.sh` — new module
 
-=== Firewall Repairs
+Features:
 
-* UFW rule management
-* firewalld zone configuration
-* iptables rule insertion
-* Common port opening
+* [ ] Signal strength measurement (dBm, quality percentage)
+* [ ] Channel congestion detection (scan nearby networks)
+* [ ] Authentication failure diagnosis (WPA/WPA2/WPA3)
+* [ ] WiFi driver issue detection
+* [ ] Hidden network discovery
+* [ ] Roaming behavior analysis
+* [ ] Power management impact assessment
 
-=== systemd-networkd Support
+CLI:
 
-* Full systemd-networkd repairs
-* .network file management
-* Link configuration
-* Network namespace handling
+[source,bash]
+----
+network-repair diagnose wireless
+network-repair diagnose wireless --interface wlp3s0
+network-repair test-wifi-signal
+----
 
-=== netplan Support
+Output example:
 
-* Netplan configuration parsing
-* Netplan apply procedures
-* Renderer switching (NM/networkd)
+[source,text]
+----
+Interface: wlp3s0
+SSID: Home Network
+Signal: -42 dBm (excellent)
+Channel: 6 (congested - 8 other networks detected)
+Recommendation: Switch AP to channel 1 or 11
+Authentication: WPA2-PSK (secure)
+Driver: iwlwifi (up to date)
+----
 
-== Phase 4: Enterprise Features
+==== VPN Diagnostics
 
-=== Plugin Architecture
+**Goal:** Detect when VPN breaks networking and guide repair.
 
-* Dynamic module loading
-* Third-party plugin support
-* Plugin discovery mechanism
-* Sandboxed execution
+Implementation (estimated 280 LOC):
 
-=== Configuration Management
+* `src/diagnostics/vpn.sh` — new module
 
-* Per-distribution config profiles
-* User preference storage
-* Config import/export
-* Central policy management
+Features:
 
-=== Remote Execution
+* [ ] Detect active VPN connections (OpenVPN, WireGuard, IPSec)
+* [ ] VPN tunnel status verification
+* [ ] Split-tunnel vs full-tunnel detection
+* [ ] VPN routing table conflicts
+* [ ] DNS leak detection
+* [ ] VPN-specific MTU issues
 
-* SSH-based remote diagnostics
-* Agent-based deployment
-* Batch server diagnostics
-* Result aggregation
+CLI:
 
-=== API & Integration
+[source,bash]
+----
+network-repair diagnose vpn
+network-repair test-vpn-leak
+----
 
-* JSON output format for all operations
+Output example:
+
+[source,text]
+----
+VPN Status: Connected (WireGuard)
+Tunnel: wg0, endpoint 1.2.3.4:51820
+Routing: Full tunnel (all traffic via VPN)
+[!] WARNING: Default route conflict detected
+    - Pre-VPN route: via 192.168.1.1 (still active)
+    - VPN route: via 10.8.0.1
+Recommendation: Remove duplicate default route
+DNS Leak Test: PASS (all queries via VPN DNS)
+----
+
+==== Enhanced Conflict Detection
+
+**Goal:** Better handling of multi-manager scenarios.
+
+Implementation (estimated 180 LOC in existing modules):
+
+* Detect NetworkManager + systemd-networkd simultaneously active
+* Detect ifupdown + NetworkManager conflicts
+* Detect manual `/etc/network/interfaces` + NM conflicts
+* Detect netplan misconfiguration
+* Warn about competing DHCP clients
+
+Example output:
+
+[source,text]
+----
+[!] CRITICAL: Network manager conflict detected
+    - NetworkManager: active, managing wlp3s0
+    - systemd-networkd: active, managing enp0s31f6
+    - Result: Interface state confusion
+
+Recommendation: Choose one network manager:
+  Option 1: Disable systemd-networkd (recommended)
+  Option 2: Disable NetworkManager
+
+Run: sudo network-repair repair conflicts
+----
+
+==== Improved Logging & Reporting
+
+**Goal:** Better diagnostics output for forums/support.
+
+Implementation (estimated 200 LOC):
+
+Features:
+
+* [ ] Structured logging with severity levels
+* [ ] Timeline view (show when things broke)
+* [ ] Comparison mode (before/after repair)
+* [ ] Markdown report generation for GitHub issues
+* [ ] Automatic PII scrubbing in reports
+
+CLI:
+
+[source,bash]
+----
+network-repair diagnose --format markdown > issue.md
+network-repair diagnose --timeline
+network-repair export --sanitize
+----
+
+==== v1.1 Milestones
+
+[cols="1,2,1"]
+|===
+|Milestone |Tasks |Target
+
+|**M1: Wireless Foundation**
+|• Wireless diagnostic module
+ • Signal strength detection
+ • Channel analysis
+|Week 1-2
+
+|**M2: VPN Support**
+|• VPN diagnostic module
+ • Tunnel detection
+ • Routing conflict detection
+|Week 3-4
+
+|**M3: Conflict Resolution**
+|• Multi-manager detection
+ • Guided conflict resolution
+ • netplan diagnostics
+|Week 5-6
+
+|**M4: Reporting**
+|• Enhanced logging
+ • Report generation
+ • PII scrubbing
+|Week 7-8
+
+|**M5: Polish & Release**
+|• Integration testing
+ • Documentation updates
+ • v1.1.0 release
+|Week 9-10
+|===
+
+**v1.1 Target: March 31, 2026**
+
+=== v1.2 Release (Q2 2026) 🎯
+
+Target: **June 2026**
+
+v1.2 is the **major enhancement release** focusing on **firewall repair, captive portals, proxy support, and plugin architecture**.
+
+==== Firewall Repair Module ⭐
+
+**Goal:** Safe, guided firewall configuration for connectivity issues.
+
+This is the **flagship feature** of v1.2.
+
+Implementation (estimated 450 LOC):
+
+* `src/repairs/firewall.sh` — new module
+
+Features:
+
+* [ ] **Safety-first design:** Never open ports without explicit user consent
+* [ ] UFW rule management (allow specific services)
+* [ ] firewalld zone configuration
+* [ ] iptables rule insertion (with backup)
+* [ ] Common service port detection (HTTP/HTTPS/SSH/DNS)
+* [ ] Temporary vs permanent rule options
+* [ ] Rule validation before application
+* [ ] Automatic rollback on connectivity loss
+
+Safety architecture:
+
+[source,bash]
+----
+# Example: User needs to access web services but firewall blocks
+$ sudo network-repair repair firewall --interactive
+
+[!] Firewall is blocking outbound HTTP/HTTPS
+    Current policy: DROP outbound on ports 80, 443
+
+Suggested repair: Allow outbound HTTP/HTTPS
+
+WARNING: This will modify firewall rules
+Backup will be created automatically
+
+Show rules to be added? [Y/n]: y
+
+Rules to add (UFW):
+  ufw allow out 80/tcp
+  ufw allow out 443/tcp
+
+Apply these changes? [y/N]: y
+Creating firewall backup: /var/backups/network-ambulance/ufw-2026-04-15_10-30-00.rules
+Applying rules...
+Testing connectivity...
+
+[✓] Firewall repaired. HTTP/HTTPS now accessible.
+    Rollback available: network-repair restore --backup ufw-2026-04-15_10-30-00
+----
+
+Supported scenarios:
+
+* Outbound connectivity blocked by overly strict firewall
+* Docker/container networking broken by firewall conflicts
+* VPN blocked by firewall rules
+* Local service access blocked (printer, NAS, etc.)
+
+**Never:**
+
+* Open inbound ports without explicit, informed consent
+* Disable firewall entirely
+* Remove security rules silently
+* Make permanent changes without user understanding
+
+CLI:
+
+[source,bash]
+----
+network-repair diagnose firewall
+sudo network-repair repair firewall --interactive
+sudo network-repair repair firewall --allow-service http
+sudo network-repair repair firewall --allow-port 8080 --temporary
+----
+
+==== Captive Portal Detection & Handling ⭐
+
+**Goal:** Detect and help users navigate captive portals (hotel WiFi, airport, coffee shop).
+
+Implementation (estimated 320 LOC):
+
+* `src/diagnostics/captive-portal.sh` — new module
+
+Features:
+
+* [ ] Captive portal detection (204 vs 302 responses)
+* [ ] Portal URL extraction
+* [ ] Browser launch assistance
+* [ ] Post-authentication verification
+* [ ] Portal bypass detection (already authenticated)
+* [ ] Timeout/expiration detection
+
+Flow:
+
+[source,bash]
+----
+$ network-repair diagnose connectivity
+
+[✓] Connected to "Airport WiFi"
+[✗] Cannot reach internet
+[!] Captive portal detected: http://192.168.100.1/login
+
+Captive portal requires authentication.
+Open login page in browser? [Y/n]: y
+
+Opening http://192.168.100.1/login in browser...
+Waiting for authentication... (60s timeout)
+
+[✓] Authentication successful! Internet now accessible.
+----
+
+Integration with AmbientOps Emergency Room for panic-free captive portal UX.
+
+==== Proxy Configuration Diagnostics ⭐
+
+**Goal:** Detect and diagnose proxy-related connectivity issues.
+
+Implementation (estimated 280 LOC):
+
+* `src/diagnostics/proxy.sh` — new module
+
+Features:
+
+* [ ] HTTP/HTTPS/SOCKS proxy detection (env vars, system settings)
+* [ ] Proxy authentication testing
+* [ ] PAC (Proxy Auto-Config) file validation
+* [ ] Proxy reachability tests
+* [ ] No-proxy exception detection
+* [ ] Corporate proxy diagnostics (NTLM, Kerberos)
+
+Example:
+
+[source,bash]
+----
+$ network-repair diagnose proxy
+
+[!] HTTP proxy detected: http://proxy.corp.com:8080
+    Set via: environment variable http_proxy
+    Authentication: required (user: jdoe)
+
+Testing proxy connectivity...
+[✗] Cannot reach proxy.corp.com:8080
+
+Diagnosis: Proxy server unreachable or incorrect credentials
+Suggestions:
+  1. Verify proxy address and port
+  2. Check proxy credentials
+  3. Try direct connection: unset http_proxy https_proxy
+----
+
+Repair actions:
+
+* Clear invalid proxy settings
+* Prompt for proxy credentials
+* Test and validate proxy configuration
+* Configure system-wide proxy settings
+
+==== Plugin Architecture (Beta) ⭐
+
+**Goal:** Allow third-party extensions for specialized network scenarios.
+
+Implementation (estimated 400 LOC):
+
+* `src/plugins/` — plugin loader
+* `docs/PLUGIN_API.adoc` — plugin development guide
+
+Features:
+
+* [ ] Plugin discovery (`~/.config/network-ambulance/plugins/`)
+* [ ] Sandboxed plugin execution
+* [ ] Plugin manifest validation
+* [ ] Diagnostic plugin hooks
+* [ ] Repair plugin hooks
+* [ ] Plugin versioning and dependencies
+
+Example plugin structure:
+
+[source,text]
+----
+plugins/
+└── mycompany-vpn/
+    ├── manifest.json
+    ├── diagnostics.sh
+    ├── repairs.sh
+    └── README.md
+----
+
+Example `manifest.json`:
+
+[source,json]
+----
+{
+  "name": "mycompany-vpn",
+  "version": "1.0.0",
+  "description": "MyCompany VPN diagnostics and repair",
+  "author": "IT Department",
+  "hooks": {
+    "diagnostics": ["vpn"],
+    "repairs": ["vpn"]
+  },
+  "requires": {
+    "network-ambulance": ">=1.2.0"
+  }
+}
+----
+
+CLI:
+
+[source,bash]
+----
+network-repair plugins list
+network-repair plugins install ./mycompany-vpn
+network-repair plugins enable mycompany-vpn
+network-repair diagnose --plugin mycompany-vpn
+----
+
+Use cases:
+
+* Corporate VPN-specific diagnostics
+* Specialized hardware (industrial networking, IoT)
+* Custom network policies
+* Integration with proprietary tools
+
+==== systemd-networkd Advanced Features
+
+**Goal:** First-class support for systemd-networkd (not just NetworkManager).
+
+Implementation (estimated 300 LOC in existing modules):
+
+Features:
+
+* [ ] Parse `.network` files for configuration
+* [ ] Detect link configuration issues
+* [ ] Network namespace diagnostics
+* [ ] networkctl integration
+* [ ] Repair `.network` file syntax errors
+* [ ] Guided transition from NetworkManager
+
+Example:
+
+[source,bash]
+----
+$ network-repair diagnose networkmanager
+
+Network Manager: systemd-networkd
+Status: active
+
+Configuration files:
+  /etc/systemd/network/10-wired.network
+    [Match] Name=enp*
+    [Network] DHCP=yes
+    Status: ✓ Valid
+
+  /etc/systemd/network/20-wireless.network
+    [Match] Name=wlp*
+    [Network] DHCP=yes
+    Status: ✗ Syntax error (line 8)
+
+[!] Configuration file has syntax error
+Run: sudo network-repair repair networkmanager
+----
+
+==== Test Coverage >90%
+
+**Goal:** Comprehensive automated testing.
+
+Implementation:
+
+* Unit tests for all diagnostic modules
+* Unit tests for all repair modules
+* Integration tests for common scenarios
+* Mock system utilities for testing
+* CI pipeline for automated testing
+
+Test framework:
+
+* Use `bats` (Bash Automated Testing System)
+* Mock utilities: `ip`, `ping`, `dig`, etc.
+* Test on multiple distros (Docker containers)
+
+Example test structure:
+
+[source,text]
+----
+tests/
+├── unit/
+│   ├── test_dns_diagnostics.bats
+│   ├── test_interface_diagnostics.bats
+│   └── ...
+├── integration/
+│   ├── test_full_repair.bats
+│   ├── test_vpn_scenarios.bats
+│   └── ...
+├── mocks/
+│   ├── ip.sh
+│   ├── ping.sh
+│   └── ...
+└── fixtures/
+    ├── sample_configs/
+    └── sample_outputs/
+----
+
+Target metrics:
+
+* Line coverage: >90%
+* Branch coverage: >85%
+* All critical paths tested
+* All repair actions tested with mocks
+
+==== v1.2 Milestones
+
+[cols="1,2,1,1"]
+|===
+|Milestone |Tasks |Duration |Target
+
+|**M1: Firewall Foundation**
+|• Firewall diagnostic enhancements
+ • Safety architecture design
+ • Backup/rollback system
+|2 weeks
+|Week 1-2 (Apr)
+
+|**M2: Firewall Repairs**
+|• UFW repair module
+ • firewalld repair module
+ • iptables repair (safe mode)
+ • Interactive guided mode
+|3 weeks
+|Week 3-5 (Apr)
+
+|**M3: Captive Portal**
+|• Portal detection
+ • Browser integration
+ • Post-auth verification
+|2 weeks
+|Week 6-7 (May)
+
+|**M4: Proxy Support**
+|• Proxy diagnostics
+ • PAC file validation
+ • Proxy repairs
+|2 weeks
+|Week 8-9 (May)
+
+|**M5: Plugin Architecture**
+|• Plugin loader
+ • Sandboxing
+ • API documentation
+ • Example plugins
+|3 weeks
+|Week 10-12 (May)
+
+|**M6: systemd-networkd**
+|• Enhanced systemd-networkd support
+ • `.network` file parsing
+ • Guided NM→systemd-networkd migration
+|2 weeks
+|Week 13-14 (Jun)
+
+|**M7: Testing & Polish**
+|• Test suite development
+ • Coverage >90%
+ • Documentation updates
+ • Beta testing
+|2 weeks
+|Week 15-16 (Jun)
+
+|**M8: Release**
+|• Release candidate
+ • Final testing
+ • v1.2.0 release
+|1 week
+|Week 17 (Jun)
+|===
+
+**v1.2 Target: June 30, 2026**
+
+=== Key Dependencies for v1.2
+
+==== External
+
+* `bats` — testing framework
+* `shellcheck` — linting (already used)
+* `jq` — JSON handling for plugin manifests
+
+==== Internal (AmbientOps Integration)
+
+* `system-tools-contracts` — evidence envelope format
+* `operating-room` — procedure orchestration
+* `emergency-button` — panic mode integration
+
+==== Distribution Testing
+
+v1.2 must be tested on:
+
+* Ubuntu 24.04 LTS, 22.04 LTS
+* Debian 12, 13
+* Fedora 40, 41
+* Arch Linux (rolling)
+* openSUSE Tumbleweed
+
+== Integration with AmbientOps (v1.2 Goal)
+
+v1.2 deepens integration with the link:https://github.com/hyperpolymath/ambientops[AmbientOps] ecosystem.
+
+=== Operating Room Integration
+
+Network Ambulance becomes a **first-class procedure pack**:
+
+* Follows Scan → Plan → Apply → Receipt workflow
+* Produces standard evidence envelopes
+* Generates procedure receipts
+* Supports undo via undo tokens
+
+Implementation:
+
+* Output format compatible with `operating-room` orchestrator
+* Receipt generation following `system-tools-contracts`
+* Evidence envelope packaging
+
+=== Ward Integration
+
+Network health signals surface in **System Weather**:
+
+* "Network: Healthy" (green)
+* "Network: Degraded - DNS slow" (yellow)
+* "Network: Down - no connectivity" (red)
+
+Implementation:
+
+* `network-repair status --format weather` — outputs simple status
+* Quick health check (<1s execution)
+* No root required
+
+=== Emergency Room Integration
+
+Network emergencies trigger **calm handoff**:
+
+1. User clicks "Network Emergency" in Emergency Room UI
+2. Emergency Room runs `network-repair diagnose --format bundle`
+3. Emergency Room shows simplified results
+4. User clicks "Auto-Repair" or "Guided Repair"
+5. Handoff to Operating Room with evidence
+
+Implementation:
+
+* Emergency mode: minimal questions, fast diagnostics
+* Panic-safe UX (no scary technical output)
+* One-click repair for common issues
+
+=== Records Integration
+
+Network Ambulance produces **shareable incident bundles**:
+
+* Diagnostic results (sanitized)
+* Repair receipts
+* Undo tokens
+* Timeline of changes
+
+Format: Compatible with Records archival and sharing.
+
+== Beyond v1.2: Future Vision
+
+=== v1.3 (Q3 2026)
+
+* TUI (Terminal UI) with real-time updates
+* Wireless repair module (reconnect, power management fixes)
+* IPv6 advanced diagnostics
+* Container network diagnostics (Docker, Podman)
+
+=== v2.0 (Q4 2026)
+
+**Major rewrite milestone:**
+
+* Core rewritten in **D** (robust, fast, cross-distro)
+* Privileged operations in **Rust** (safety-critical)
+* Plugin API stabilized (v1)
+* JSON API for programmatic access
+* Web UI (optional, lightweight)
+
+Breaking changes:
+
+* Plugin API v1 (not compatible with v1.2 beta)
+* New configuration format
+* New evidence envelope format (v2)
+
+Migration guide provided.
+
+=== v3.0 (2027)
+
+**Enterprise features:**
+
+* Remote diagnostics via SSH
+* Batch server operations
+* Centralized policy management
+* Prometheus metrics export
 * REST API server mode
-* Prometheus metrics endpoint
-* SNMP trap integration
+* Multi-language UI
 
-== Phase 5: User Experience
+== Success Metrics
 
-=== Web Interface
+=== v1.2 Goals
 
-* Browser-based dashboard
-* Real-time diagnostic display
-* One-click repairs
-* Mobile-responsive design
+Adoption:
 
-=== TUI (Terminal UI)
+* [ ] 1,000+ installs across distributions
+* [ ] 10+ community plugins
+* [ ] Featured in 3+ distribution repos (AUR, Debian, Fedora)
 
-* ncurses-based interface
-* Real-time updates
-* Mouse support
-* Keyboard navigation
+Quality:
 
-=== Internationalization
+* [ ] Test coverage >90%
+* [ ] Zero critical bugs in release
+* [ ] <5 bug reports per month after release
 
-* Multi-language support
-* Locale-aware formatting
-* RTL language support
-* Translation framework
+Integration:
 
-=== Accessibility
+* [ ] Full AmbientOps integration (Ward, ER, OR, Records)
+* [ ] Evidence envelope format v1 compliance
+* [ ] Plugin API documented and stable
 
-* Screen reader compatibility
-* High-contrast mode
-* Keyboard-only navigation
-* Reduced motion support
+Community:
 
-== Phase 6: Data & Analytics
+* [ ] 20+ contributors
+* [ ] 5+ active maintainers
+* [ ] Documentation in 3+ languages
 
-=== Diagnostic History
+== Contributing to the Roadmap
 
-* SQLite database for history
-* Trend analysis
-* Issue recurrence detection
-* Time-based reporting
+We welcome input on roadmap priorities!
 
-=== Reporting
-
-* PDF report generation
-* HTML diagnostic reports
-* Email report delivery
-* Scheduled diagnostics
-
-=== Machine Learning
-
-* Pattern recognition for issues
-* Predictive failure detection
-* Automated repair suggestions
-* Self-improving diagnostics
-
-== Phase 7: Ecosystem
-
-=== Package Distribution
-
-* Debian/Ubuntu .deb packages
-* Fedora/RHEL .rpm packages
-* Arch AUR package
-* Flatpak/Snap packages
-* AppImage portable binary
-
-=== Container Support
-
-* Docker diagnostics
-* Kubernetes network debugging
-* Container network namespace handling
-* CNI plugin diagnostics
-
-=== Cloud Integration
-
-* AWS VPC diagnostics
-* GCP network diagnostics
-* Azure networking checks
-* Cloud metadata detection
-
-== Technical Debt & Improvements
-
-=== Code Quality
-
-* [ ] Complete ShellCheck compliance
-* [ ] Unit test coverage >80%
-* [ ] Integration test suite
-* [ ] Documentation generation
-
-=== Performance
-
-* [ ] Parallel diagnostic execution
-* [ ] Cached system detection
-* [ ] Lazy module loading
-* [ ] Reduced subprocess spawning
-
-=== Security
-
-* [ ] Security audit
-* [ ] Signed releases
-* [ ] CVE monitoring
-* [ ] Privilege minimization review
-
-== Version Planning
-
-=== v1.1.0
-
-* Wireless diagnostics improvements
-* VPN detection basics
-* Bug fixes from v1.0 feedback
-
-=== v1.2.0
-
-* Firewall repair module
-* systemd-networkd improvements
-* Extended test coverage
-
-=== v2.0.0
-
-* Plugin architecture
-* JSON API output
-* Breaking changes for clean design
-
-=== v3.0.0
-
-* Web interface
-* Remote execution
-* Enterprise features
-
-== Contributing
-
-See link:CONTRIBUTING.md[CONTRIBUTING.md] for how to contribute to roadmap items.
+* Suggest features: https://github.com/hyperpolymath/network-ambulance/discussions
+* Vote on priorities: https://github.com/hyperpolymath/network-ambulance/issues?q=is%3Aissue+is%3Aopen+label%3Aroadmap
+* Contribute code: See link:CONTRIBUTING.adoc[CONTRIBUTING.adoc]
 
 Priority is given to:
 
-1. Bug fixes and stability improvements
-2. Multi-distribution compatibility
-3. User-requested features
-4. Documentation improvements
+1. Safety and reliability
+2. User-requested features (real pain points)
+3. Multi-distribution compatibility
+4. AmbientOps integration
+5. Testing and quality improvements
+
+== License
+
+This roadmap is part of Network Ambulance and is licensed under PMPL-1.0-or-later.
+
+---
+
+**Next milestone: v1.1 (March 2026)**
+
+**Current focus: v1.2 planning and architecture (this document)**
+
+Last updated: 2026-01-29

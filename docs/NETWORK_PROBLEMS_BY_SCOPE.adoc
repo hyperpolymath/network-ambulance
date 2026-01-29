@@ -1,0 +1,770 @@
+= Network Problems by Scope: What Network Ambulance Can and Cannot Solve
+:toc:
+:toclevels: 4
+:icons: font
+
+Comprehensive mapping of network problems across different network scopes (PAN, LAN, MAN, WAN, SD-WAN) and Network Ambulance's capabilities.
+
+== Legend
+
+* ✅ **Can solve** — Network Ambulance has diagnostics and repairs
+* ⚠️ **Partial** — Can diagnose, limited repair capability
+* ❌ **Cannot solve** — Outside Network Ambulance's scope
+* 🔮 **Future** — Planned for future versions
+
+== Personal Area Network (PAN)
+
+Scope: Device-to-device connectivity within ~10 meters (Bluetooth, USB tethering, WiFi Direct)
+
+=== Problems Network Ambulance CAN Solve ✅
+
+[cols="1,2,2"]
+|===
+|Error/Symptom |Diagnostic |Repair
+
+|USB tethering interface down
+|Detect USB network interface, check link state
+|Bring up interface, renew DHCP
+
+|Bluetooth tethering slow
+|Detect BT tethering, measure latency
+|Recommend switching to WiFi/Ethernet
+
+|PAN interface has no IP
+|Check interface configuration, DHCP status
+|Request DHCP lease, configure static IP
+
+|Can't reach phone hotspot
+|Test connectivity to gateway, check DNS
+|Reset interface, reconnect
+|===
+
+**Common error codes:**
+
+* `ENETUNREACH` (Network unreachable) → Check routing to PAN gateway
+* `EHOSTUNREACH` (Host unreachable) → Verify PAN device is powered on
+* `ECONNREFUSED` (Connection refused) → Check if tethering is enabled on device
+
+=== Problems Network Ambulance CANNOT Solve ❌
+
+[cols="1,2,2"]
+|===
+|Problem |Why Not |Alternative
+
+|Bluetooth pairing failures
+|OS-specific Bluetooth stack issues
+|Use `bluetoothctl` directly
+
+|USB cable physically damaged
+|Hardware problem
+|Replace cable
+
+|Phone battery dead
+|Physical device issue
+|Charge device
+
+|WiFi Direct authentication
+|Complex P2P protocol
+|Use OS-specific WiFi Direct tools
+|===
+
+== Local Area Network (LAN)
+
+Scope: Local network within building/campus (Ethernet, WiFi within single AP or VLAN)
+
+=== Problems Network Ambulance CAN Solve ✅
+
+[cols="1,2,2,1"]
+|===
+|Error/Symptom |Diagnostic |Repair |Error Codes
+
+|**No IP address (DHCP failure)**
+|Check DHCP service, lease status, DHCP server reachability
+|Renew DHCP lease, restart DHCP client, fallback to static IP
+|`ENETDOWN`, `EADDRNOTAVAIL`
+
+|**Wrong subnet**
+|Compare IP to expected subnet, check DHCP scope
+|Release and renew DHCP, request correct subnet
+|`ENETUNREACH`
+
+|**Duplicate IP address**
+|ARP table scan, conflict detection
+|Release IP, request new lease from DHCP
+|`EADDRINUSE`
+
+|**Cannot reach gateway**
+|Ping gateway, check routing table, ARP cache
+|Add default route, flush ARP cache, reset gateway config
+|`EHOSTUNREACH`, `ENETUNREACH`
+
+|**DNS not resolving local names**
+|Test DNS server, check search domains, query local DNS
+|Configure local DNS server, add search domains
+|`EAI_NONAME`, `ESERVFAIL`
+
+|**Interface down (Ethernet)**
+|Check interface status, link state, driver
+|Bring up interface, reload driver if needed
+|`ENETDOWN`, `ENXIO`
+
+|**Interface down (WiFi)**
+|Check WiFi status, signal strength, auth state
+|Reconnect to AP, restart wpa_supplicant
+|`ENETDOWN`, `ECONNREFUSED`
+
+|**Wrong VLAN**
+|Detect VLAN tags, check switch config (if accessible)
+|Reconfigure interface with correct VLAN tag
+|`ENETUNREACH`
+
+|**MTU mismatch**
+|Path MTU discovery, test with various packet sizes
+|Set appropriate MTU for LAN (usually 1500)
+|`EMSGSIZE`
+
+|**ARP cache poisoning (detection)**
+|Monitor ARP table for suspicious changes
+|Flush ARP cache, report to admin
+|N/A (security issue)
+
+|**NetworkManager conflicts**
+|Detect multiple network managers, check interface control
+|Stop conflicting managers, assign interfaces appropriately
+|Various
+
+|**Firewall blocking LAN access**
+|Test connectivity to LAN services, check firewall rules
+|Allow LAN subnet in firewall (with user approval)
+|`ECONNREFUSED`, `ETIMEDOUT`
+|===
+
+**Common LAN error codes:**
+
+* `ENETDOWN` (Network is down) → Interface is down, bring it up
+* `ENETUNREACH` (Network unreachable) → No route to LAN, add default route
+* `EHOSTUNREACH` (Host unreachable) → Gateway not responding, check ARP/routing
+* `ECONNREFUSED` (Connection refused) → Firewall blocking, service not running
+* `ETIMEDOUT` (Connection timed out) → Network congestion or firewall
+* `EADDRNOTAVAIL` (Address not available) → DHCP failed or invalid static IP
+* `EADDRINUSE` (Address already in use) → IP conflict
+
+=== Problems Network Ambulance CANNOT Solve ❌
+
+[cols="1,2,2"]
+|===
+|Problem |Why Not |Alternative
+
+|**Switch port disabled**
+|No access to switch management
+|Contact network admin
+
+|**Wrong VLAN configured on switch**
+|Requires switch configuration
+|Contact network admin
+
+|**MAC address filtering**
+|Requires router/AP configuration
+|Add MAC to whitelist via router UI
+
+|**802.1X authentication**
+|Complex enterprise auth (RADIUS)
+|Configure supplicant credentials manually
+
+|**Physical cable damage**
+|Hardware issue
+|Replace cable, check with cable tester
+
+|**Router/AP hardware failure**
+|Hardware issue
+|Replace device
+
+|**ISP DHCP server down**
+|External to LAN
+|Contact ISP
+
+|**Captive portal requires payment**
+|Business logic/payment system
+|Pay for access via portal
+|===
+
+=== Problems Network Ambulance Can Partially Solve ⚠️
+
+[cols="1,3,2"]
+|===
+|Problem |What We Can Do |Limitation
+
+|**Captive portal (hotel/airport WiFi)**
+|Detect portal, extract login URL, open browser, verify post-auth
+|Cannot auto-fill credentials or payment
+
+|**Slow WiFi (channel congestion)**
+|Detect congestion, measure signal strength, recommend channel
+|Cannot change AP channel (requires AP access)
+
+|**WiFi authentication failure**
+|Detect auth failure, test credentials format
+|Cannot fix wrong password (user must provide)
+
+|**Proxy configuration**
+|Detect proxy, test connectivity through proxy
+|Cannot auto-discover all proxy types (some require manual config)
+|===
+
+== Metropolitan Area Network (MAN)
+
+Scope: City-wide network (ISP backbone, municipal WiFi, campus-wide networks)
+
+=== Problems Network Ambulance CAN Solve ✅
+
+[cols="1,2,2"]
+|===
+|Error/Symptom |Diagnostic |Repair
+
+|Local routing issues
+|Trace route to MAN edge, detect loops
+|Fix local routing table
+
+|DNS resolver issues
+|Test ISP DNS vs public DNS, measure latency
+|Switch to faster/reliable DNS (Google, Cloudflare)
+
+|MTU issues (PPPoE/DSL)
+|Path MTU discovery across MAN
+|Set appropriate MTU (usually 1492 for PPPoE)
+|===
+
+**Relevant error codes:**
+
+* `ENETUNREACH` (Network unreachable) → ISP routing issue (can detect, cannot fix)
+* `EHOSTUNREACH` (Host unreachable) → Upstream routing issue
+* `EMSGSIZE` (Message too large) → MTU mismatch (can fix)
+
+=== Problems Network Ambulance CANNOT Solve ❌
+
+[cols="1,2,2"]
+|===
+|Problem |Why Not |Alternative
+
+|ISP backbone outage
+|Infrastructure outside user control
+|Contact ISP, check status page
+
+|Peering issues between ISPs
+|External to local network
+|Wait for ISP to resolve
+
+|Fiber cut / physical damage
+|Infrastructure issue
+|ISP must repair
+
+|ISP throttling
+|Policy/business issue
+|Contact ISP, use VPN (may help)
+
+|BGP routing issues
+|Requires ISP intervention
+|Contact ISP
+
+|CG-NAT issues
+|ISP network design
+|Request public IP from ISP
+|===
+
+== Wide Area Network (WAN)
+
+Scope: Internet, inter-city links, connections to external services
+
+=== Problems Network Ambulance CAN Solve ✅
+
+[cols="1,2,2,1"]
+|===
+|Error/Symptom |Diagnostic |Repair |Error Codes
+
+|**Cannot reach internet (LAN OK)**
+|Test connectivity to public IPs, check default route, verify gateway
+|Add default route, configure gateway, flush route cache
+|`ENETUNREACH`
+
+|**DNS resolution fails (internet)**
+|Test public DNS servers, check DNS config, measure latency
+|Switch to public DNS (8.8.8.8, 1.1.1.1)
+|`EAI_NONAME`, `ESERVFAIL`
+
+|**Slow DNS resolution**
+|Measure DNS query times, test multiple resolvers
+|Switch to faster DNS server
+|`ETIMEDOUT`
+
+|**Asymmetric routing (egress OK, ingress fails)**
+|Trace route both directions, check reverse path
+|Fix local routing table (cannot fix ISP routing)
+|`EHOSTUNREACH`
+
+|**MTU black hole (packets dropped)**
+|Path MTU discovery, detect ICMP filtering
+|Lower MTU, enable MSS clamping
+|`EMSGSIZE`, `ETIMEDOUT`
+
+|**VPN breaks internet**
+|Detect VPN routing conflicts, check split-tunnel config
+|Fix routing table, disable full-tunnel if unwanted
+|`ENETUNREACH`
+
+|**Firewall blocks outbound**
+|Test connectivity to common services (HTTP/HTTPS/DNS)
+|Allow outbound traffic in firewall (with user approval)
+|`ECONNREFUSED`, `ETIMEDOUT`
+|===
+
+**Common WAN error codes:**
+
+* `ENETUNREACH` (Network unreachable) → No route to internet
+* `EHOSTUNREACH` (Host unreachable) → ISP routing issue or firewall
+* `ETIMEDOUT` (Connection timed out) → Packet loss, congestion, or MTU issues
+* `ECONNREFUSED` (Connection refused) → Firewall or remote service down
+* `EAI_NONAME` (Name or service not known) → DNS resolution failed
+* `ESERVFAIL` (DNS server failure) → DNS server unreachable
+
+=== Problems Network Ambulance CANNOT Solve ❌
+
+[cols="1,2,2"]
+|===
+|Problem |Why Not |Alternative
+
+|**ISP outage**
+|External infrastructure
+|Wait for ISP, use mobile backup
+
+|**DDoS attack on target site**
+|External attack
+|Wait for site to recover
+
+|**Site blocked by government/ISP**
+|Policy/legal issue
+|Use VPN (may work), contact ISP
+
+|**Undersea cable cut**
+|Global infrastructure
+|Wait for repair (days/weeks)
+
+|**Satellite latency (500ms+)**
+|Physics (speed of light)
+|Accept latency or switch provider
+
+|**Bandwidth exhaustion (too many users)**
+|Capacity issue
+|Upgrade ISP plan, QoS (cannot fix)
+
+|**ISP throttling specific sites**
+|ISP policy
+|Use VPN, complain to ISP
+|===
+
+=== Problems Network Ambulance Can Partially Solve ⚠️
+
+[cols="1,3,2"]
+|===
+|Problem |What We Can Do |Limitation
+
+|**Geoblocking**
+|Detect geo-based blocking, recommend VPN
+|Cannot bypass (requires VPN/proxy)
+
+|**IPv6 vs IPv4 issues**
+|Detect dual-stack issues, prefer-IPv4 fallback
+|Cannot fix ISP's IPv6 support
+
+|**Path MTU black hole**
+|Detect via path MTU discovery, lower MTU locally
+|Cannot fix upstream ICMP filtering
+
+|**High latency (congestion)**
+|Measure latency, detect congestion points
+|Cannot reduce (ISP or path issue)
+|===
+
+== SD-WAN (Software-Defined WAN)
+
+Scope: Enterprise multi-site connectivity, cloud-native networking
+
+=== Problems Network Ambulance CAN Solve ✅ (v1.2+)
+
+[cols="1,2,2"]
+|===
+|Error/Symptom |Diagnostic |Repair
+
+|VPN tunnel down (local side)
+|Check VPN client status, credentials, routing
+|Restart VPN client, fix local routing
+
+|Split-tunnel misconfiguration
+|Detect traffic routing (VPN vs direct)
+|Reconfigure split-tunnel routes
+
+|DNS leaked outside VPN
+|Test DNS queries, check resolver
+|Force DNS through VPN interface
+
+|Firewall blocks VPN protocols
+|Test VPN port connectivity (UDP 51820, etc.)
+|Allow VPN ports in firewall (with approval)
+|===
+
+**Relevant error codes:**
+
+* `ECONNREFUSED` (Connection refused) → VPN port blocked by firewall
+* `ENETUNREACH` (Network unreachable) → VPN routing issue
+* `ETIMEDOUT` (Connection timed out) → VPN server unreachable
+
+=== Problems Network Ambulance CANNOT Solve ❌
+
+[cols="1,2,2"]
+|===
+|Problem |Why Not |Alternative
+
+|**SD-WAN controller offline**
+|Infrastructure issue
+|Contact network admin
+
+|**IPSec tunnel SA negotiation failed**
+|Complex crypto/policy mismatch
+|Check IKE/IPSec logs, contact admin
+
+|**MPLS circuit down**
+|ISP/carrier issue
+|Contact carrier
+
+|**SD-WAN orchestrator policy**
+|Requires management plane access
+|Use SD-WAN controller UI
+
+|**WireGuard tunnel (remote side down)**
+|Remote endpoint issue
+|Contact remote admin
+
+|**VPN credentials expired**
+|Authentication/policy issue
+|Renew credentials via VPN admin
+|===
+
+=== Problems Network Ambulance Can Partially Solve ⚠️ (v1.2+)
+
+[cols="1,3,2"]
+|===
+|Problem |What We Can Do |Limitation
+
+|**VPN routing conflicts**
+|Detect conflicts, show routing table issues
+|Can fix local routes, cannot fix remote policy
+
+|**VPN MTU issues**
+|Detect encapsulation overhead, calculate correct MTU
+|Can set local MTU, cannot change VPN server MTU
+
+|**VPN DNS conflicts**
+|Detect DNS resolution routing
+|Can prefer VPN DNS, cannot force if policy forbids
+|===
+
+== Summary Table: Network Ambulance Capabilities
+
+[cols="1,1,1,1,1,1"]
+|===
+|Problem Category |PAN |LAN |MAN |WAN |SD-WAN
+
+|**DHCP issues**
+|✅
+|✅
+|❌
+|❌
+|✅
+
+|**DNS issues**
+|✅
+|✅
+|✅
+|✅
+|⚠️
+
+|**Routing issues (local)**
+|✅
+|✅
+|⚠️
+|⚠️
+|✅
+
+|**Interface up/down**
+|✅
+|✅
+|❌
+|❌
+|✅
+
+|**Firewall issues**
+|⚠️
+|✅ (v1.2)
+|❌
+|✅ (v1.2)
+|✅ (v1.2)
+
+|**VPN issues**
+|❌
+|❌
+|❌
+|⚠️ (v1.1)
+|⚠️ (v1.2)
+
+|**Wireless issues**
+|⚠️
+|⚠️ (v1.1)
+|❌
+|❌
+|❌
+
+|**MTU issues**
+|✅
+|✅
+|✅
+|⚠️
+|⚠️
+
+|**Captive portals**
+|❌
+|⚠️ (v1.2)
+|⚠️ (v1.2)
+|⚠️ (v1.2)
+|❌
+
+|**ISP outages**
+|❌
+|❌
+|❌
+|❌
+|❌
+
+|**Hardware failures**
+|❌
+|❌
+|❌
+|❌
+|❌
+|===
+
+== Error Code Quick Reference
+
+=== POSIX Socket Errors
+
+[cols="1,2,3"]
+|===
+|Error Code |Meaning |Network Ambulance Action
+
+|`ENETDOWN`
+|Network interface is down
+|✅ Bring up interface, check driver
+
+|`ENETUNREACH`
+|Network is unreachable
+|✅ Check routing table, add default route
+
+|`EHOSTUNREACH`
+|Host is unreachable
+|✅ Check gateway reachability, ARP cache
+
+|`ECONNREFUSED`
+|Connection refused
+|⚠️ Check firewall rules, cannot fix if service is down
+
+|`ETIMEDOUT`
+|Connection timed out
+|⚠️ Check connectivity, MTU; cannot fix congestion
+
+|`EADDRNOTAVAIL`
+|Address not available
+|✅ Fix DHCP, configure valid IP
+
+|`EADDRINUSE`
+|Address already in use
+|✅ Detect conflict, request new IP from DHCP
+
+|`EMSGSIZE`
+|Message too large
+|✅ Adjust MTU, enable MSS clamping
+
+|`ENXIO`
+|No such device or address
+|⚠️ Check hardware, reload driver
+
+|`ENODEV`
+|No such device
+|❌ Hardware not present or driver missing
+|===
+
+=== DNS Errors (getaddrinfo)
+
+[cols="1,2,3"]
+|===
+|Error Code |Meaning |Network Ambulance Action
+
+|`EAI_NONAME`
+|Name or service not known
+|✅ Check DNS config, test resolution, switch DNS
+
+|`EAI_AGAIN`
+|Temporary failure in name resolution
+|⚠️ Retry, check DNS server reachability
+
+|`EAI_FAIL`
+|Non-recoverable failure
+|✅ Check DNS server, switch to public DNS
+
+|`EAI_NODATA`
+|No address associated with hostname
+|⚠️ Verify hostname exists (cannot fix if doesn't)
+
+|`ESERVFAIL`
+|DNS server failure
+|✅ Switch DNS server, restart systemd-resolved
+|===
+
+=== HTTP Error Codes (Connectivity Context)
+
+[cols="1,2,3"]
+|===
+|HTTP Code |Meaning |Network Ambulance Action
+
+|`DNS_PROBE_FINISHED_NO_INTERNET`
+|Browser: no internet
+|✅ Full diagnostics, check connectivity + DNS
+
+|`ERR_CONNECTION_REFUSED`
+|Browser: connection refused
+|⚠️ Check firewall, verify service is running
+
+|`ERR_CONNECTION_TIMED_OUT`
+|Browser: timeout
+|⚠️ Check connectivity, MTU, latency
+
+|`ERR_NAME_NOT_RESOLVED`
+|Browser: DNS failed
+|✅ Fix DNS configuration
+
+|`ERR_INTERNET_DISCONNECTED`
+|Browser: no network
+|✅ Check interface status, bring up if down
+
+|`ERR_PROXY_CONNECTION_FAILED`
+|Browser: proxy issue
+|⚠️ (v1.2) Check proxy config, test proxy
+|===
+
+== Version Roadmap: Problem Coverage
+
+=== v1.0 (Current) ✅
+
+* **LAN**: Full coverage for DHCP, DNS, routing, interfaces, NetworkManager
+* **WAN**: Basic internet connectivity issues
+* **PAN**: USB/Bluetooth tethering basics
+* **MAN/SD-WAN**: DNS only
+
+=== v1.1 (Q1 2026) 🔮
+
+* **LAN**: Wireless diagnostics (signal, channels, auth)
+* **WAN**: VPN detection and basic diagnostics
+* **MAN**: Improved latency and path diagnostics
+
+=== v1.2 (Q2 2026) 🎯 **Current Target**
+
+* **LAN**: Firewall repair, captive portal detection
+* **WAN**: Proxy diagnostics, VPN routing fixes
+* **SD-WAN**: VPN split-tunnel repair, basic IPSec diagnostics
+
+=== v2.0 (Q4 2026) 🔮
+
+* **LAN**: 802.1X diagnostics, advanced wireless repair
+* **WAN**: Cloud service connectivity diagnostics
+* **SD-WAN**: Full VPN orchestration diagnostics
+
+=== v3.0 (2027) 🔮
+
+* **MAN**: ISP peering diagnostics (read-only)
+* **SD-WAN**: Enterprise SD-WAN integration (controller API)
+* **All**: Predictive failure detection via ML
+
+== What Network Ambulance Will NEVER Solve
+
+Some problems are fundamentally outside scope:
+
+1. **Hardware failures** — Replace hardware
+2. **ISP/carrier outages** — Wait for provider
+3. **Incorrect credentials** — User must provide correct creds
+4. **Payment/subscription issues** — User must pay
+5. **Legal/policy blocks** — Cannot bypass censorship
+6. **Malicious attacks** — Not a security tool (detection only)
+7. **Physical layer issues** — Cannot fix cables/fiber remotely
+8. **Switch/router configuration** — Requires admin access
+
+== Diagnostic vs Repair Coverage
+
+[cols="2,1,1"]
+|===
+|Problem Area |Can Diagnose |Can Repair
+
+|DHCP failures
+|✅
+|✅
+
+|DNS issues
+|✅
+|✅
+
+|Routing table issues
+|✅
+|✅
+
+|Interface down
+|✅
+|✅
+
+|Firewall blocking
+|✅
+|⚠️ (v1.2, with approval)
+
+|VPN issues
+|⚠️ (v1.1)
+|⚠️ (v1.2, local only)
+
+|Captive portals
+|⚠️ (v1.2)
+|⚠️ (detect + open, cannot auth)
+
+|ISP outages
+|✅
+|❌ (external)
+
+|Hardware failures
+|⚠️ (detect)
+|❌ (physical)
+
+|Wireless auth failures
+|✅
+|❌ (need correct password)
+
+|MTU issues
+|✅
+|✅
+
+|Latency/congestion
+|✅
+|❌ (external)
+|===
+
+== See Also
+
+* link:../README.adoc[README] — Overview and quick start
+* link:ROADMAP.adoc[ROADMAP] — Feature roadmap
+* link:AMBIENTOPS_INTEGRATION.adoc[AmbientOps Integration] — Ecosystem integration
+
+---
+
+Last updated: 2026-01-29
