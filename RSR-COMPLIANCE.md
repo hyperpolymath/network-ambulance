@@ -54,7 +54,7 @@
 
 5. **Build Automation** (1/3 complete)
    - ✅ Shell scripts
-   - ❌ justfile for task running - **ADDING**
+   - ❌ Justfile for task running - **ADDING**
    - ❌ Reproducible builds - **DOCUMENTING**
 
 6. **TPCF (Tri-Perimeter Contribution Framework)** (0/1 complete)
@@ -95,7 +95,7 @@
 - ✅ Installation script
 - ✅ Uninstall support
 - ✅ Dependency checking
-- ❌ justfile automation
+- ❌ Justfile automation
 
 ### 4. Testing ✅ (70%)
 - ✅ Test suite
@@ -160,7 +160,7 @@
 6. ✅ Add ai.txt
 7. ✅ Add humans.txt
 8. ✅ Add TPCF.md
-9. ✅ Add justfile
+9. ✅ Add Justfile
 10. ✅ Enhance tests to 100% pass rate
 
 ### Timeline:
@@ -182,7 +182,7 @@
 
 ### Phase 2: TPCF & Build Automation (Today)
 - TPCF.md (Tri-Perimeter Contribution Framework)
-- justfile with common tasks
+- Justfile with common tasks
 - Enhanced test suite
 - RSR compliance verification script
 
