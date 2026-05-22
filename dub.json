@@ -3,7 +3,7 @@
     "description": "Network diagnostics and repair for Linux",
     "authors": ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"],
     "copyright": "Copyright © 2026, Hyperpolymath",
-    "license": "PMPL-1.0-or-later",
+    "license": "MPL-2.0",
     "version": "1.1.0-alpha",
 
     "targetType": "executable",

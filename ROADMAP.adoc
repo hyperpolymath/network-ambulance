@@ -854,7 +854,7 @@ Priority is given to:
 
 == License
 
-This roadmap is part of Network Ambulance and is licensed under PMPL-1.0-or-later.
+This roadmap is part of Network Ambulance and is licensed under MPL-2.0.
 
 ---
 

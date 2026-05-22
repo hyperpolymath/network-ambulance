@@ -650,7 +650,7 @@ Priority areas for v1.2:
 
 == License
 
-Network Ambulance is licensed under PMPL-1.0-or-later (Palimpsest Meta-Permissive License).
+Network Ambulance is licensed under MPL-2.0 (Palimpsest Meta-Permissive License).
 
 See link:LICENSE[LICENSE] for details.
 
