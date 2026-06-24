@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MPL-2.0
 # Dockerfile for Alpine Linux testing
 ARG BASE_IMAGE=alpine:3.20
 FROM ${BASE_IMAGE}

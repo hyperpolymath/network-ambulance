@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MPL-2.0
 # Run tests across multiple Linux distributions using containers
 #
 # Usage: ./run-container-tests.sh [distro] [--quick]

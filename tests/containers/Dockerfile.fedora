@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MPL-2.0
 # Dockerfile for Fedora/RHEL-based testing
 ARG BASE_IMAGE=fedora:40
 FROM ${BASE_IMAGE}
