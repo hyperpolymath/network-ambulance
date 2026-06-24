@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MPL-2.0
 # Integration tests for safe mode functionality
 
 set -euo pipefail

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MPL-2.0
 # Test runner for Complete Linux Internet Repair Tool
 
 set -euo pipefail

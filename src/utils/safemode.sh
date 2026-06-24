@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MPL-2.0
 # Safe mode utilities - provides read-only diagnostic mode by default
 
 # Safe mode configuration

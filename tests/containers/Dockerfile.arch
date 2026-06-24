@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MPL-2.0
 # Dockerfile for Arch Linux testing
 FROM archlinux:latest
 

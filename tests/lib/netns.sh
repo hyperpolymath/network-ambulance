@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MPL-2.0
 # Network namespace utilities for safe network testing
 #
 # This module provides isolated network environments for testing
