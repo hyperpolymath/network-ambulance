@@ -37,7 +37,7 @@ jobs:
           sha256sum network-repair-${{ steps.get_version.outputs.VERSION }}.tar.gz > checksums.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           files: |
             release/network-repair-${{ steps.get_version.outputs.VERSION }}.tar.gz
