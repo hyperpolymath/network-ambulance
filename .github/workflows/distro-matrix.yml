@@ -17,6 +17,7 @@ on:
         default: "all"
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
