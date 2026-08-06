@@ -18,7 +18,6 @@ concurrency:
   cancel-in-progress: true
 
 permissions: read-all
-  actions: read
 
 jobs:
   analyze:
