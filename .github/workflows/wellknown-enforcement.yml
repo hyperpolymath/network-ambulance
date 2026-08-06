@@ -16,7 +16,6 @@ on:
 
 
 permissions: read-all
-  actions: read
 
 jobs:
   validate:
