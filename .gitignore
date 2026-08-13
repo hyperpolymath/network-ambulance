@@ -85,3 +85,14 @@ deps/
 .cache/
 build/
 dist/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.claude/
+.editorconfig
+/exports/*.json
+/exports/*.lgt
+ai-cli-crash-capture/
+composer/*.beam
+composer/build/
