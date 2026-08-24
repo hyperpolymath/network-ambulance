@@ -1,86 +1,71 @@
-// SPDX-License-Identifier: CC-BY-SA-4.0
-= Changelog
+== Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to `+network-ambulance+` will be documented in this
+file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+This file is generated from conventional commits by the
+https://github.com/hyperpolymath/standards/blob/main/.github/workflows/changelog-reusable.yml[`+changelog-reusable.yml+`]
+workflow (`+hyperpolymath/standards#206+`). Adopt the workflow in this
+repo’s CI to keep this file in sync automatically — see
+https://github.com/hyperpolymath/standards/blob/main/templates/cliff.toml[`+templates/cliff.toml+`]
+for the canonical config.
 
-== [Unreleased]
+The format follows https://keepachangelog.com/en/1.1.0/[Keep a
+Changelog]; this project aims to follow
+https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
-=== Planned
-- IPv6 connectivity diagnostics and repairs
-- Wireless-specific diagnostics (signal strength, channel interference)
-- VPN and proxy detection and diagnostics
-- Web-based dashboard interface
-- Package repository releases (apt, yum, AUR)
+=== [Unreleased]
 
-== [1.0.0] - 2025-01-22
+==== Added
 
-=== Added
-- Initial release
-- Complete diagnostic suite:
-  - DNS configuration and resolution diagnostics
-  - Network interface status diagnostics
-  - Routing table diagnostics
-  - Internet connectivity testing
-  - Firewall configuration analysis
-  - NetworkManager status checking
-- Automated repair procedures:
-  - DNS configuration repair
-  - Network interface management (bring up, DHCP renewal)
-  - Routing table repair
-  - NetworkManager reconnection
-- Multiple operation modes:
-  - CLI mode for quick diagnostics
-  - Interactive guided mode
-  - Auto-repair mode
-  - Dry-run mode
-- Core utility functions:
-  - Colored logging system
-  - Privilege checking and elevation
-  - Automatic file backup
-  - System detection (distribution, network manager)
-- Safety features:
-  - Automatic backups before modifications
-  - Dry-run preview mode
-  - Detailed logging
-  - Root privilege checking
-- Installation script
-- Comprehensive test suite
-- Multi-distribution support:
-  - Ubuntu/Debian family
-  - Fedora/RHEL family
-  - Arch Linux family
-- Documentation:
-  - User README
-  - Contributing guidelines
-  - AI development guide (CLAUDE.md)
-  - Usage examples
+* feat: add AI Gatekeeper Protocol manifest
+* feat(ipv6): comprehensive IPv4/IPv6 dual-stack diagnostics and
+monitoring
+* feat(tauri+rescript): add cross-platform GUI with Tauri 2.0 + ReScript
+* feat(ada): add Ada 2022 + SPARK TUI prototype
+* feat(d): add JSON output mode for diagnostics and repairs
+* feat(d): add routing repair module
+* feat(d): add interface repair module
+* feat(d): add DNS repair module and CLI repair command
+* feat(d): add routing and connectivity diagnostics
+* feat: initial D lang core engine implementation (prototype)
 
-=== Security
-- Input sanitization to prevent command injection
-- Privilege escalation only when necessary
-- File permission checks
-- Backup of configuration files before modification
+==== Fixed
 
-== [0.1.0] - Development
+* fix(ci): build Hypatia escript from repo root (estate dogfood drift)
+* fix(ci): Phase-2 fleet submission must not fail the security gate (#5)
+* fix(ci): hypatia-scan workdir ($\{\{ env.HOME }} resolves empty) (#4)
+* fix(ci): bump erlef/setup-beam SHA for ubuntu24 runner support (#3)
+* fix(ci): hypatia-scan.yml – pass GITHUB_TOKEN, use –exit-zero
+(hyperpolymath/hypatia#213) (#2)
+* fix: remove duplicate SCM files from root
+* fix(security): update editorconfig SHA and CodeQL language
+* fix: SHA-pin checkout action, add SPDX header and permissions
+* fix: SHA-pin checkout action, add SPDX header and permissions
+* fix: SHA-pin checkout action, add SPDX header and permissions
 
-=== Added
-- Initial project structure
-- Basic diagnostic framework
-- Proof of concept implementations
+==== Documentation
 
----
+* docs: update SCM files with project information
+* docs: add CONTRIBUTING.md
+* docs: add checkpoint files for state tracking
+* docs(ipv6): add comprehensive transition mechanism and monitoring
+guides
+* docs(minix): add comprehensive MINIX 3.x build documentation
+* docs: add D lang core architecture and Ada/SPARK TUI design
+* docs: add comprehensive network problem mapping by scope
+* docs: update license from AGPL to PMPL
 
-== Version History Summary
+==== CI
 
-=== Version 1.0.0
-- First stable release
-- Production-ready diagnostic and repair tools
-- Complete documentation
-- Multi-distribution support
+* ci: bump actions/upload-artifact SHA to current v4 (#1)
 
-[Unreleased]: https://github.com/yourusername/complete-linux-internet-repair/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/yourusername/complete-linux-internet-repair/releases/tag/v1.0.0
-[0.1.0]: https://github.com/yourusername/complete-linux-internet-repair/releases/tag/v0.1.0
+=== Pre-history
+
+Prior commits to this file’s introduction are recorded in git history
+but not formally classified into Keep-a-Changelog sections. To backfill,
+run `+git cliff -o CHANGELOG.md+` locally using the canonical
+https://github.com/hyperpolymath/standards/blob/main/templates/cliff.toml[`+cliff.toml+`]
+— this is one-shot mechanical work.
+
+'''''
