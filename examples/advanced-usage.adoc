@@ -1,22 +1,25 @@
-# Advanced Usage Examples
+== Advanced Usage Examples
 
-This document provides advanced usage examples and integration scenarios.
+This document provides advanced usage examples and integration
+scenarios.
 
-## Custom Diagnostic Workflows
+=== Custom Diagnostic Workflows
 
-### Selective Diagnostics
+==== Selective Diagnostics
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Run only network-related diagnostics
 
 network-repair diagnose-network
 network-repair diagnose-routing
-```
+----
 
-### Conditional Repairs
+==== Conditional Repairs
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Repair based on specific conditions
 
@@ -31,13 +34,14 @@ if ! ping -c 3 8.8.8.8 >/dev/null 2>&1; then
     echo "Connectivity issues detected"
     sudo network-repair repair-all
 fi
-```
+----
 
-## Integration Examples
+=== Integration Examples
 
-### Pre-deployment Network Check
+==== Pre-deployment Network Check
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Ensure network is working before deployment
 
@@ -67,11 +71,12 @@ fi
 
 echo "Network is healthy. Proceeding with deployment..."
 # Continue with deployment
-```
+----
 
-### Monitoring Script
+==== Monitoring Script
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Continuous network monitoring with repair
 
@@ -100,11 +105,12 @@ while true; do
 
     sleep ${CHECK_INTERVAL}
 done
-```
+----
 
-### Docker Container Network Repair
+==== Docker Container Network Repair
 
-```dockerfile
+[source,dockerfile]
+----
 # Dockerfile
 FROM ubuntu:22.04
 
@@ -120,19 +126,21 @@ RUN chmod +x /opt/network-repair/network-repair
 
 ENTRYPOINT ["/opt/network-repair/network-repair"]
 CMD ["diagnose"]
-```
+----
 
-```bash
+[source,bash]
+----
 # Build and run
 docker build -t network-repair .
 docker run --rm --network host --cap-add=NET_ADMIN network-repair diagnose
-```
+----
 
-## Custom DNS Configuration
+=== Custom DNS Configuration
 
-### Using Specific DNS Servers
+==== Using Specific DNS Servers
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Configure custom DNS servers
 
@@ -147,11 +155,12 @@ DEFAULT_DNS_SERVERS="9.9.9.9 149.112.112.112" sudo network-repair repair-dns
 
 # Use multiple providers
 DEFAULT_DNS_SERVERS="8.8.8.8 1.1.1.1 9.9.9.9" sudo network-repair repair-dns
-```
+----
 
-### Corporate Network DNS
+==== Corporate Network DNS
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Use corporate DNS servers
 
@@ -163,13 +172,14 @@ sudo -E network-repair repair-dns
 
 # Verify
 dig @10.0.0.1 internal.corp.example.com
-```
+----
 
-## Multi-Interface Scenarios
+=== Multi-Interface Scenarios
 
-### Prioritize Specific Interface
+==== Prioritize Specific Interface
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Ensure specific interface is primary
 
@@ -187,11 +197,12 @@ sudo ip route add default via "${GATEWAY}" dev "${PRIMARY_INTERFACE}"
 
 # Verify
 network-repair diagnose-routing
-```
+----
 
-### Bonding/Teaming Setup Check
+==== Bonding/Teaming Setup Check
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Verify bonded interface configuration
 
@@ -209,13 +220,14 @@ cat /proc/net/bonding/"${BOND_INTERFACE}"
 # Run diagnostics
 network-repair diagnose-network
 network-repair diagnose-routing
-```
+----
 
-## VPN Integration
+=== VPN Integration
 
-### Pre-VPN Connection Check
+==== Pre-VPN Connection Check
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Ensure network is working before VPN connection
 
@@ -229,11 +241,12 @@ fi
 # Connect to VPN
 echo "Connecting to VPN..."
 sudo openvpn --config /etc/openvpn/client.conf
-```
+----
 
-### Post-VPN Diagnostics
+==== Post-VPN Diagnostics
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Verify network after VPN connection
 
@@ -256,13 +269,14 @@ else
     sudo killall openvpn
     sudo network-repair repair-all
 fi
-```
+----
 
-## Ansible Integration
+=== Ansible Integration
 
-### Playbook Example
+==== Playbook Example
 
-```yaml
+[source,yaml]
+----
 ---
 - name: Ensure network connectivity
   hosts: all
@@ -289,13 +303,14 @@ fi
       command: ping -c 3 8.8.8.8
       register: ping_result
       failed_when: ping_result.rc != 0
-```
+----
 
-## Systemd Integration
+=== Systemd Integration
 
-### Network Repair Service
+==== Network Repair Service
 
-```ini
+[source,ini]
+----
 # /etc/systemd/system/network-repair.service
 [Unit]
 Description=Network Repair Service
@@ -312,11 +327,12 @@ StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-```
+----
 
-### Network Repair Timer
+==== Network Repair Timer
 
-```ini
+[source,ini]
+----
 # /etc/systemd/system/network-repair.timer
 [Unit]
 Description=Network Repair Timer
@@ -329,20 +345,23 @@ AccuracySec=1min
 
 [Install]
 WantedBy=timers.target
-```
+----
 
 Enable:
-```bash
+
+[source,bash]
+----
 sudo systemctl enable network-repair.timer
 sudo systemctl start network-repair.timer
 sudo systemctl status network-repair.timer
-```
+----
 
-## Logging and Alerting
+=== Logging and Alerting
 
-### Advanced Logging
+==== Advanced Logging
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Comprehensive logging setup
 
@@ -360,11 +379,12 @@ sudo -E network-repair diagnose 2>&1 | tee -a "${LOG_FILE}"
 
 # Rotate logs
 find /var/log/network-repair -name "repair-*.log" -mtime +30 -delete
-```
+----
 
-### Email Alerts
+==== Email Alerts
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Email alerts on network issues
 
@@ -384,11 +404,12 @@ if ! network-repair diagnose > /tmp/network-diag.txt 2>&1; then
 fi
 
 rm -f /tmp/network-diag.txt /tmp/network-repair.txt
-```
+----
 
-### Slack/Discord Notifications
+==== Slack/Discord Notifications
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Send notifications to Slack
 
@@ -411,13 +432,14 @@ if ! network-repair diagnose; then
         send_slack_message "❌ Failed to repair network on $(hostname)"
     fi
 fi
-```
+----
 
-## Testing and Development
+=== Testing and Development
 
-### Test in Virtual Machine
+==== Test in Virtual Machine
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Create test environment in VM
 
@@ -430,11 +452,12 @@ sudo network-repair --auto-repair repair
 
 # Verify fix
 ping -c 3 google.com
-```
+----
 
-### Simulate Network Issues
+==== Simulate Network Issues
 
-```bash
+[source,bash]
+----
 #!/bin/bash
 # Test script - simulates various network issues
 
@@ -458,6 +481,8 @@ sudo network-repair repair-routing
 
 # Cleanup
 echo "Test complete"
-```
+----
 
-This advanced usage guide demonstrates the flexibility and power of the Complete Linux Internet Repair Tool in various scenarios and environments.
+This advanced usage guide demonstrates the flexibility and power of the
+Complete Linux Internet Repair Tool in various scenarios and
+environments.
