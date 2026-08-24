@@ -1,0 +1,397 @@
+== Architecture Documentation
+
+=== Overview
+
+The Complete Linux Internet Repair Tool is designed as a modular
+bash-based system for diagnosing and repairing network connectivity
+issues on Linux systems.
+
+=== Design Principles
+
+[arabic]
+. *Modularity*: Each diagnostic and repair function is self-contained
+. *Safety*: Always backup before modifications, support dry-run mode
+. *Portability*: Works across multiple Linux distributions
+. *Transparency*: Detailed logging of all operations
+. *Fail-safe*: Graceful degradation if optional tools are missing
+
+=== Component Architecture
+
+....
+┌─────────────────────────────────────────────────┐
+│           Main Entry Point (main.sh)            │
+│  - Argument parsing                             │
+│  - Mode selection (CLI/Interactive)             │
+│  - Orchestrates diagnostic and repair flows     │
+└────────────┬────────────────────────────────────┘
+             │
+    ┌────────┴────────┐
+    │                 │
+┌───▼────────┐   ┌───▼────────┐
+│Diagnostics │   │  Repairs   │
+│  Modules   │   │  Modules   │
+└───┬────────┘   └───┬────────┘
+    │                │
+    │   ┌────────────┴────────────┐
+    │   │                         │
+    │   │      Utility Layer      │
+    │   │  - Logging              │
+    │   │  - Colors               │
+    │   │  - Privileges           │
+    │   │  - Backup               │
+    │   │  - System Detection     │
+    │   │                         │
+    │   └─────────────────────────┘
+    │
+┌───▼──────────────────────────────────┐
+│     Linux System Interface           │
+│  - ip/iproute2                       │
+│  - systemctl                         │
+│  - NetworkManager                    │
+│  - DNS tools                         │
+└──────────────────────────────────────┘
+....
+
+=== Module Descriptions
+
+==== Utility Modules
+
+Located in `+src/utils/+`
+
+===== colors.sh
+
+* Provides terminal color support
+* Auto-detects color capability
+* Exports color variables for use in other modules
+
+===== logging.sh
+
+* Centralized logging system
+* Multiple log levels (DEBUG, INFO, WARN, ERROR, FATAL)
+* File and console output
+* Colored output support
+
+===== privileges.sh
+
+* Root privilege detection
+* Sudo access management
+* Safe privilege elevation
+
+===== backup.sh
+
+* Automatic file backup before modifications
+* Timestamped backups
+* Backup retention policies
+* Restore functionality
+
+===== system.sh
+
+* Distribution detection
+* Network manager detection
+* Interface management functions
+* DNS testing utilities
+
+==== Diagnostic Modules
+
+Located in `+src/diagnostics/+`
+
+Each diagnostic module: - Sources required utilities - Implements
+specific checks - Returns exit code: 0 (no issues) or 1 (issues found) -
+Logs findings using logging utility
+
+===== dns.sh
+
+*Checks:* - `+/etc/resolv.conf+` configuration - systemd-resolved status
+- NetworkManager DNS settings - DNS resolution functionality - DNS
+server responsiveness
+
+*Functions:* - `+check_dns_config()+` - Validates DNS configuration
+files - `+test_dns_resolution()+` - Tests actual DNS resolution -
+`+test_dns_servers()+` - Tests individual DNS servers -
+`+diagnose_dns()+` - Main diagnostic function
+
+===== interfaces.sh
+
+*Checks:* - Interface existence and status - IP address assignment - MAC
+addresses - Link status - Driver information - Interface statistics
+
+*Functions:* - `+check_interfaces()+` - Lists and checks all interfaces
+- `+check_primary_interface()+` - Validates primary interface -
+`+check_interface_stats()+` - Checks for errors/drops -
+`+diagnose_interfaces()+` - Main diagnostic function
+
+===== routing.sh
+
+*Checks:* - Default route existence - Gateway reachability - IPv6
+routing - Route metrics - ARP table
+
+*Functions:* - `+check_routing_table()+` - Validates routing table -
+`+check_ipv6_routing()+` - IPv6 route checks - `+test_internet_route()+`
+- Tests routes to internet - `+diagnose_routing()+` - Main diagnostic
+function
+
+===== connectivity.sh
+
+*Checks:* - Basic ping connectivity - DNS-based connectivity -
+HTTP/HTTPS connectivity - Port connectivity - MTU - Latency
+
+*Functions:* - `+test_basic_connectivity()+` - Ping tests -
+`+test_dns_connectivity()+` - DNS + ping tests -
+`+test_http_connectivity()+` - Web connectivity - `+test_mtu()+` - MTU
+discovery - `+diagnose_connectivity()+` - Main diagnostic function
+
+===== firewall.sh
+
+*Checks:* - iptables rules - nftables rules - UFW status - firewalld
+status
+
+*Functions:* - `+check_iptables()+` - Examines iptables rules -
+`+check_ufw()+` - UFW configuration - `+check_firewalld()+` - firewalld
+configuration - `+diagnose_firewall()+` - Main diagnostic function
+
+===== networkmanager.sh
+
+*Checks:* - NetworkManager service status - Active connections - Device
+status - Connectivity state - Configuration - Conflicts with other
+network managers
+
+*Functions:* - `+check_nm_status()+` - Service status -
+`+check_nm_connections()+` - Connection status -
+`+check_nm_conflicts()+` - Detect conflicts -
+`+diagnose_networkmanager()+` - Main diagnostic function
+
+==== Repair Modules
+
+Located in `+src/repairs/+`
+
+Each repair module: - Requires root privileges (checked) - Creates
+backups before modifications - Implements fixes for common issues -
+Verifies repairs succeeded - Returns exit code: 0 (success) or 1
+(failure)
+
+===== dns.sh
+
+*Repairs:* - Creates missing `+/etc/resolv.conf+` - Adds working DNS
+servers - Resets DNS to known-good defaults - Restarts systemd-resolved
+- Flushes DNS cache - Configures NetworkManager DNS
+
+*Functions:* - `+repair_dns_config()+` - Fix DNS configuration -
+`+reset_dns_to_defaults()+` - Complete DNS reset -
+`+restart_systemd_resolved()+` - Restart DNS service -
+`+flush_dns_cache()+` - Clear cached entries - `+repair_dns()+` - Main
+repair function
+
+===== interfaces.sh
+
+*Repairs:* - Brings up down interfaces - Restarts problematic interfaces
+- Renews DHCP leases - Resets interface to DHCP - Configures primary
+interface
+
+*Functions:* - `+interface_up()+` - Bring interface up -
+`+restart_interface()+` - Restart interface - `+renew_dhcp()+` - Renew
+DHCP lease - `+repair_interfaces()+` - Main repair function
+
+===== routing.sh
+
+*Repairs:* - Adds missing default route - Removes duplicate routes -
+Repairs gateway configuration - Flushes and rebuilds routing table
+
+*Functions:* - `+add_default_route()+` - Add default route -
+`+remove_duplicate_routes()+` - Clean routing table -
+`+repair_default_route()+` - Fix default route - `+repair_routing()+` -
+Main repair function
+
+===== networkmanager.sh
+
+*Repairs:* - Restarts NetworkManager service - Reconnects connections -
+Enables management on interfaces - Repairs conflicts - Resets
+connections
+
+*Functions:* - `+restart_networkmanager()+` - Restart service -
+`+reconnect_nm_connection()+` - Reconnect - `+repair_nm_conflicts()+` -
+Fix conflicts - `+repair_networkmanager()+` - Main repair function
+
+=== Data Flow
+
+==== Diagnostic Flow
+
+....
+User → main.sh → parse_args()
+              ↓
+         run_all_diagnostics()
+              ↓
+    ┌─────────┴─────────┐
+    │                   │
+diagnose_dns()    diagnose_interfaces()
+    │                   │
+    └─────────┬─────────┘
+              ↓
+       Aggregate Results
+              ↓
+     Display Summary
+              ↓
+    Offer to Repair (if issues found)
+....
+
+==== Repair Flow
+
+....
+User → main.sh → parse_args()
+              ↓
+         require_root()
+              ↓
+       run_all_repairs()
+              ↓
+    ┌─────────┴─────────┐
+    │                   │
+repair_dns()      repair_interfaces()
+    │                   │
+    ├─ backup_file()    ├─ interface_up()
+    ├─ modify_config()  ├─ renew_dhcp()
+    └─ verify_fix()     └─ verify_fix()
+              │
+              └─────────┬─────────
+                        ↓
+                 Final Connectivity Test
+                        ↓
+                  Display Summary
+....
+
+=== Error Handling
+
+==== Philosophy
+
+[arabic]
+. *Fail gracefully*: Continue with other checks if one fails
+. *Report clearly*: Detailed error messages
+. *Provide context*: Suggest next steps
+. *Preserve state*: Backup before destructive operations
+
+==== Implementation
+
+[source,bash]
+----
+# Check exit codes
+if ! some_command; then
+    log_error "Command failed: some_command"
+    return 1
+fi
+
+# Aggregate errors
+local total_issues=0
+check_something
+total_issues=$((total_issues + $?))
+
+# Always verify
+if verify_fix; then
+    log_success "Fix successful"
+else
+    log_error "Fix failed, restoring backup"
+    restore_backup
+fi
+----
+
+=== Security Considerations
+
+==== Privilege Escalation
+
+* Only request root when necessary
+* Clear indication when sudo is needed
+* Keep sudo alive for batch operations
+* No arbitrary command execution
+
+==== Input Validation
+
+[source,bash]
+----
+# Sanitize all user inputs
+interface=$(sanitize_input "${interface}")
+
+# Validate before use
+if ! interface_exists "${interface}"; then
+    log_error "Invalid interface"
+    return 1
+fi
+----
+
+==== File Operations
+
+* Backup before modification
+* Verify file permissions
+* Use temporary files for complex operations
+* Clean up temporary files
+
+==== Command Injection Prevention
+
+* Quote all variables
+* Use arrays for command construction
+* Sanitize inputs
+* Avoid eval
+
+=== Testing Strategy
+
+==== Unit Tests
+
+* Test individual functions
+* Mock system commands
+* Test error conditions
+
+==== Integration Tests
+
+* Test full workflows
+* Test on multiple distributions
+* Test with various network configurations
+
+==== Syntax Validation
+
+* Bash syntax checking (`+bash -n+`)
+* ShellCheck linting
+* Style guide compliance
+
+=== Extension Points
+
+==== Adding New Diagnostics
+
+[arabic]
+. Create file in `+src/diagnostics/+`
+. Implement `+diagnose_modulename()+` function
+. Source in `+main.sh+`
+. Add to `+run_all_diagnostics()+`
+. Add tests
+. Update documentation
+
+==== Adding New Repairs
+
+[arabic]
+. Create file in `+src/repairs/+`
+. Implement `+repair_modulename()+` function
+. Source in `+main.sh+`
+. Add to `+run_all_repairs()+`
+. Add tests
+. Update documentation
+
+==== Adding New Utilities
+
+[arabic]
+. Create file in `+src/utils/+`
+. Implement utility functions
+. Source in modules that need it
+. Add tests
+. Document in CLAUDE.md
+
+=== Performance Considerations
+
+* Parallel execution where possible (using background jobs)
+* Minimize external command calls
+* Cache expensive operations
+* Use built-in bash features over external commands
+
+=== Future Architecture Improvements
+
+[arabic]
+. *Plugin System*: Dynamic module loading
+. *Configuration Management*: Per-distribution configs
+. *Remote Execution*: SSH-based remote diagnostics
+. *API Layer*: JSON output for programmatic use
+. *Database*: Store diagnostic history
+. *Web Interface*: Browser-based management
