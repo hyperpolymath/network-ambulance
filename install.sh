@@ -100,7 +100,7 @@ copy_files() {
     cp network-repair "${INSTALL_DIR}/"
 
     # Copy documentation
-    [[ -f README.md ]] && cp README.md "${INSTALL_DIR}/"
+    [[ -f README.adoc ]] && cp README.adoc "${INSTALL_DIR}/"
     [[ -f LICENSE ]] && cp LICENSE "${INSTALL_DIR}/"
 
     print_msg "${GREEN}" "Files copied"
