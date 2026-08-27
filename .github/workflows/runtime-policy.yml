@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
+# This workflow is managed by gh actions-lock.
 # Runtime and package-manager policy check.
 #
 # Authority: hyperpolymath/standards LANGUAGE-POLICY.adoc §1.
@@ -36,7 +37,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
 
       - name: Report runtime tier and reject mixed toolchains
         run: |
