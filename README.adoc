@@ -635,7 +635,7 @@ See link:ROADMAP.adoc[ROADMAP.adoc] for the complete roadmap to v1.2 and beyond.
 
 == Contributing
 
-We welcome contributions! See link:CONTRIBUTING.adoc[CONTRIBUTING.adoc].
+We welcome contributions! See link:.github/CONTRIBUTING.md[.github/CONTRIBUTING.md].
 
 Priority areas for v1.2:
 

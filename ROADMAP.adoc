@@ -842,7 +842,7 @@ We welcome input on roadmap priorities!
 
 * Suggest features: https://github.com/hyperpolymath/network-ambulance/discussions
 * Vote on priorities: https://github.com/hyperpolymath/network-ambulance/issues?q=is%3Aissue+is%3Aopen+label%3Aroadmap
-* Contribute code: See link:CONTRIBUTING.adoc[CONTRIBUTING.adoc]
+* Contribute code: See link:.github/CONTRIBUTING.md[.github/CONTRIBUTING.md]
 
 Priority is given to:
 
