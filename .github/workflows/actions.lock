@@ -45,7 +45,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
     '.github/workflows/test.yml':
         - 'actions/checkout@v7.0.1'
-        - 'ludeeus/action-shellcheck@master'
+        - 'ludeeus/action-shellcheck@2.0.0'
     '.github/workflows/wellknown-enforcement.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/workflow-linter.yml':
@@ -98,9 +98,9 @@ dependencies:
         commit: 'sha1-22e7bdb322c430c1d0dac6b3bb307f4bb139d0be'
         owner_id: 6759885
         repo_id: 1352485172
-    'ludeeus/action-shellcheck@master':
-        ref: 'master'
-        commit: 'sha1-00b27aa7cb85167568cb48a3838b75f4265f2bca'
+    'ludeeus/action-shellcheck@2.0.0':
+        ref: '2.0.0'
+        commit: 'sha1-00cae500b08a931fb5698e11e79bfbd38e612a38'
         owner_id: 15093472
         repo_id: 174679242
     'ossf/scorecard-action@v2.4.4':
@@ -123,3 +123,38 @@ dependencies:
         commit: 'sha1-363923b901c911a9164f50b6c423f47c15372b1c'
         owner_id: 79229934
         repo_id: 77726177
+    'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9':
+        ref: 'v6.1.0'
+        commit: 'sha1-55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
+        owner_id: 44036562
+        repo_id: 215566462
+    'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1':
+        ref: 'v7.0.1'
+        commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
+        owner_id: 44036562
+        repo_id: 197814629
+    'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a':
+        ref: 'v7.0.1'
+        commit: 'sha1-043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+        owner_id: 44036562
+        repo_id: 192625955
+    'dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772':
+        ref: 'stable'
+        commit: 'sha1-6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772'
+        owner_id: 1940490
+        repo_id: 260749683
+    'erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124':
+        ref: 'v1.24.1'
+        commit: 'sha1-54075bcc5e249e4758d363f27d099f55d843f124'
+        owner_id: 47606891
+        repo_id: 331103973
+    'ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc':
+        ref: 'v2.4.4'
+        commit: 'sha1-2d1146689b8cda280b9bc96326124645441f03bc'
+        owner_id: 67707773
+        repo_id: 421101922
+    'webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555':
+        ref: 'v0.10.0'
+        commit: 'sha1-e83874834305fe9a4a2997156cb26c5de65a8555'
+        owner_id: 135788
+        repo_id: 208510314
