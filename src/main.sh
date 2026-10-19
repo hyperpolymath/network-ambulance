@@ -5,33 +5,34 @@
 
 set -euo pipefail
 
-# Script directory
-MAIN_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Script directory. The modules sourced below resolve their own directory
+# into NR_UTILS_DIR / NR_REPAIRS_DIR and must not assign SCRIPT_DIR.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Version
 VERSION="1.0.0"
 
 # Source utilities
-source "${MAIN_SCRIPT_DIR}/utils/colors.sh"
-source "${MAIN_SCRIPT_DIR}/utils/logging.sh"
-source "${MAIN_SCRIPT_DIR}/utils/privileges.sh"
-source "${MAIN_SCRIPT_DIR}/utils/system.sh"
-source "${MAIN_SCRIPT_DIR}/utils/backup.sh"
-source "${MAIN_SCRIPT_DIR}/utils/safemode.sh"
+source "${SCRIPT_DIR}/utils/colors.sh"
+source "${SCRIPT_DIR}/utils/logging.sh"
+source "${SCRIPT_DIR}/utils/privileges.sh"
+source "${SCRIPT_DIR}/utils/system.sh"
+source "${SCRIPT_DIR}/utils/backup.sh"
+source "${SCRIPT_DIR}/utils/safemode.sh"
 
 # Source diagnostics
-source "${MAIN_SCRIPT_DIR}/diagnostics/dns.sh"
-source "${MAIN_SCRIPT_DIR}/diagnostics/interfaces.sh"
-source "${MAIN_SCRIPT_DIR}/diagnostics/routing.sh"
-source "${MAIN_SCRIPT_DIR}/diagnostics/connectivity.sh"
-source "${MAIN_SCRIPT_DIR}/diagnostics/firewall.sh"
-source "${MAIN_SCRIPT_DIR}/diagnostics/networkmanager.sh"
+source "${SCRIPT_DIR}/diagnostics/dns.sh"
+source "${SCRIPT_DIR}/diagnostics/interfaces.sh"
+source "${SCRIPT_DIR}/diagnostics/routing.sh"
+source "${SCRIPT_DIR}/diagnostics/connectivity.sh"
+source "${SCRIPT_DIR}/diagnostics/firewall.sh"
+source "${SCRIPT_DIR}/diagnostics/networkmanager.sh"
 
 # Source repairs
-source "${MAIN_SCRIPT_DIR}/repairs/dns.sh"
-source "${MAIN_SCRIPT_DIR}/repairs/interfaces.sh"
-source "${MAIN_SCRIPT_DIR}/repairs/routing.sh"
-source "${MAIN_SCRIPT_DIR}/repairs/networkmanager.sh"
+source "${SCRIPT_DIR}/repairs/dns.sh"
+source "${SCRIPT_DIR}/repairs/interfaces.sh"
+source "${SCRIPT_DIR}/repairs/routing.sh"
+source "${SCRIPT_DIR}/repairs/networkmanager.sh"
 
 # Configuration
 DRY_RUN="${DRY_RUN:-false}"
@@ -123,29 +124,23 @@ run_all_diagnostics() {
     log_info "Network Manager: $(detect_network_manager)"
     echo ""
 
-    # Run diagnostics
-    diagnose_interfaces
-    total_issues=$((total_issues + $?))
+    # Diagnostic failures report issues; collect them without triggering errexit.
+    diagnose_interfaces || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_routing
-    total_issues=$((total_issues + $?))
+    diagnose_routing || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_dns
-    total_issues=$((total_issues + $?))
+    diagnose_dns || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_connectivity
-    total_issues=$((total_issues + $?))
+    diagnose_connectivity || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_firewall
-    total_issues=$((total_issues + $?))
+    diagnose_firewall || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_networkmanager
-    total_issues=$((total_issues + $?))
+    diagnose_networkmanager || total_issues=$((total_issues + $?))
     echo ""
 
     # Summary

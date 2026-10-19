@@ -2,9 +2,9 @@
 # Routing diagnostics module
 
 # Source utilities
-DIAGNOSTICS_ROUTING_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${DIAGNOSTICS_ROUTING_SCRIPT_DIR}/../utils/logging.sh"
-source "${DIAGNOSTICS_ROUTING_SCRIPT_DIR}/../utils/system.sh"
+NR_UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../utils" && pwd)"
+source "${NR_UTILS_DIR}/logging.sh"
+source "${NR_UTILS_DIR}/system.sh"
 
 # Check routing table
 check_routing_table() {

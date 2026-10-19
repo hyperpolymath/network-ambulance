@@ -2,10 +2,10 @@
 # NetworkManager repair procedures
 
 # Source utilities
-REPAIRS_NETWORKMANAGER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${REPAIRS_NETWORKMANAGER_SCRIPT_DIR}/../utils/logging.sh"
-source "${REPAIRS_NETWORKMANAGER_SCRIPT_DIR}/../utils/system.sh"
-source "${REPAIRS_NETWORKMANAGER_SCRIPT_DIR}/../utils/privileges.sh"
+NR_UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../utils" && pwd)"
+source "${NR_UTILS_DIR}/logging.sh"
+source "${NR_UTILS_DIR}/system.sh"
+source "${NR_UTILS_DIR}/privileges.sh"
 
 # Restart NetworkManager
 restart_networkmanager() {
