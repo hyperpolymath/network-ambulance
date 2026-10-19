@@ -5,7 +5,8 @@
 
 set -euo pipefail
 
-# Script directory
+# Script directory. The modules sourced below resolve their own directory
+# into NR_UTILS_DIR / NR_REPAIRS_DIR and must not assign SCRIPT_DIR.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Version
