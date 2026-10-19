@@ -60,21 +60,37 @@ jobs:
           fi
           echo "All workflows have permissions declared"
 
+      # Bun is the estate's first-choice runtime (LANGUAGE-POLICY.adoc §1:
+      # Bun > Deno > pnpm > npm). Tag form
+      # matches every other ref in this repo and is resolved by actions.lock.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: latest
+
       - name: Check SHA-Pinned Actions
         run: |
           echo "=== Checking Action Pinning ==="
           # Find any uses: lines that don't have @SHA format
           # Pattern: uses: owner/repo@<40-char-hex>
-          unpinned=$(grep -rnE "^[[:space:]]+uses:" .github/workflows/ | \
-            grep -v "@[a-f0-9]\{40\}" | \
-            grep -v "uses: \./\|uses: docker://\|uses: actions/github-script" || true)
+          # Delegated to scripts/check-action-pinning.js. The rule it enforces is
+          # unchanged in spirit — every action ref must resolve to an immutable
+          # commit — but "pinned" now includes refs the workflow lockfile
+          # resolves, which is how this repo pins them. Kept as a script rather
+          # than inline because the inline form needs a heredoc inside a YAML
+          # block scalar, and that is a well-known way to ship a gate that
+          # silently does nothing.
+          if ! bun scripts/check-action-pinning.js; then
+            unpinned="see above"
+          else
+            unpinned=""
+          fi
 
           if [ -n "$unpinned" ]; then
             echo "ERROR: Found unpinned actions:"
-            echo "$unpinned"
             echo ""
             echo "Replace version tags with SHA pins, e.g.:"
-            echo "  uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.1.1"
+            echo "  uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
             exit 1
           fi
           echo "All actions are SHA-pinned"
