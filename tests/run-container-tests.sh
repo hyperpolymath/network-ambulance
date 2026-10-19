@@ -81,7 +81,7 @@ get_install_cmd() {
             echo "apk add --no-cache bash iproute2 iputils bind-tools curl sudo procps coreutils"
             ;;
         opensuse/*:*)
-            echo "zypper --non-interactive install bash iproute2 iputils bind-utils curl sudo procps"
+            echo "zypper --non-interactive install bash iproute2 iputils bind-utils curl sudo procps findutils grep sed gawk coreutils hostname"
             ;;
         *)
             echo "echo 'Unknown distro'"
