@@ -124,29 +124,23 @@ run_all_diagnostics() {
     log_info "Network Manager: $(detect_network_manager)"
     echo ""
 
-    # Run diagnostics
-    diagnose_interfaces
-    total_issues=$((total_issues + $?))
+    # Diagnostic failures report issues; collect them without triggering errexit.
+    diagnose_interfaces || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_routing
-    total_issues=$((total_issues + $?))
+    diagnose_routing || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_dns
-    total_issues=$((total_issues + $?))
+    diagnose_dns || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_connectivity
-    total_issues=$((total_issues + $?))
+    diagnose_connectivity || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_firewall
-    total_issues=$((total_issues + $?))
+    diagnose_firewall || total_issues=$((total_issues + $?))
     echo ""
 
-    diagnose_networkmanager
-    total_issues=$((total_issues + $?))
+    diagnose_networkmanager || total_issues=$((total_issues + $?))
     echo ""
 
     # Summary
