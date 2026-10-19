@@ -71,7 +71,7 @@ jobs:
           [ "$deno" -eq 1 ] && echo "Deno  — tier 2"
           [ "$deno_cfg" -eq 1 ] && echo "::notice::A deno.json is authored for Deno (tier 2, permitted; notice only, LANGUAGE-POLICY.adoc §1.3). Keep scripts in package.json so Bun runs them too."
           [ "$pnpm" -eq 1 ] && echo "pnpm  — tier 3"
-          [ "$npm"  -eq 1 ] && echo "::warning::npm lockfile present. npm is tier 4, the last resort — permitted, never preferred, and it keeps no lock: package-lock.json is refused (standards#67). See LANGUAGE-POLICY.adoc §1.4."
+          [ "$npm"  -eq 1 ] && echo "::warning::npm lockfile present. npm is tier 4, the last resort — permitted, never preferred. A standalone package-lock.json is permitted; it is rejected only beside a js-runtimes lock (standards#67). See LANGUAGE-POLICY.adoc §1.4."
 
           if [ "$npm" -eq 1 ] && [ "$regen" -gt 0 ]; then
             echo "::error::Mixed toolchains: package-lock.json sits next to the js-runtimes locks."
