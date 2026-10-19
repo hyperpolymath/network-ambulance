@@ -40,7 +40,6 @@ declare -A DISTROS=(
     ["ubuntu-20.04"]="ubuntu:20.04"
     ["ubuntu-22.04"]="ubuntu:22.04"
     ["ubuntu-24.04"]="ubuntu:24.04"
-    ["debian-11"]="debian:11"
     ["debian-12"]="debian:12"
     # RHEL family
     ["fedora-39"]="fedora:39"
@@ -73,7 +72,7 @@ get_install_cmd() {
             echo "apt-get update && apt-get install -y bash iproute2 iputils-ping dnsutils curl sudo procps"
             ;;
         fedora:*|rockylinux:*|almalinux:*)
-            echo "dnf install -y bash iproute iputils bind-utils curl sudo procps-ng"
+            echo "dnf install -y --allowerasing bash iproute iputils bind-utils curl sudo procps-ng"
             ;;
         archlinux:*)
             echo "pacman -Syu --noconfirm && pacman -S --noconfirm bash iproute2 iputils bind curl sudo procps-ng"
