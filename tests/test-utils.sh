@@ -11,14 +11,37 @@ source "${PROJECT_DIR}/src/utils/colors.sh"
 source "${PROJECT_DIR}/src/utils/logging.sh"
 source "${PROJECT_DIR}/src/utils/system.sh"
 
+# Load modules in fresh shells from an unrelated directory. Sourced dependencies
+# must not replace the caller's directory or break subsequent relative imports.
+test_module_loading() {
+    echo "Testing module loading..."
+
+    local module
+    for module in "${PROJECT_DIR}/src/utils/logging.sh" \
+                  "${PROJECT_DIR}"/src/diagnostics/*.sh \
+                  "${PROJECT_DIR}"/src/repairs/*.sh; do
+        if ! bash -euc '
+            cd /
+            SCRIPT_DIR=caller-directory
+            source "$1"
+            [[ "${SCRIPT_DIR}" == caller-directory ]]
+        ' _ "${module}"; then
+            echo "Module loading failed: ${module}"
+            exit 1
+        fi
+    done
+
+    echo "✓ Modules load without changing the caller directory"
+}
+
 # Test colors
 test_colors() {
     echo "Testing color utilities..."
 
-    # Test that color variables are defined
-    [[ -n "${COLOR_RED}" ]] || { echo "COLOR_RED not defined"; exit 1; }
-    [[ -n "${COLOR_GREEN}" ]] || { echo "COLOR_GREEN not defined"; exit 1; }
-    [[ -n "${COLOR_RESET}" ]] || { echo "COLOR_RESET not defined"; exit 1; }
+    # Color values are intentionally empty when stdout is not a terminal (CI).
+    [[ -v COLOR_RED ]] || { echo "COLOR_RED not defined"; exit 1; }
+    [[ -v COLOR_GREEN ]] || { echo "COLOR_GREEN not defined"; exit 1; }
+    [[ -v COLOR_RESET ]] || { echo "COLOR_RESET not defined"; exit 1; }
 
     echo "✓ Color utilities work"
 }
@@ -68,6 +91,7 @@ main() {
     test_colors
     test_logging
     test_system
+    test_module_loading
 
     echo ""
     echo "All utility tests passed!"

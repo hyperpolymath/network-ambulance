@@ -2,10 +2,10 @@
 # Network interface repair procedures
 
 # Source utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/logging.sh"
-source "${SCRIPT_DIR}/../utils/system.sh"
-source "${SCRIPT_DIR}/../utils/privileges.sh"
+REPAIRS_INTERFACES_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${REPAIRS_INTERFACES_SCRIPT_DIR}/../utils/logging.sh"
+source "${REPAIRS_INTERFACES_SCRIPT_DIR}/../utils/system.sh"
+source "${REPAIRS_INTERFACES_SCRIPT_DIR}/../utils/privileges.sh"
 
 # Bring up network interface
 interface_up() {

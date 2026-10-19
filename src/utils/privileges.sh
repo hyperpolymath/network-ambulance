@@ -42,7 +42,8 @@ require_root() {
     ( while true; do sudo -n true; sleep 50; done 2>/dev/null ) &
     SUDO_KEEPER_PID=$!
 
-    # Kill sudo keeper on exit
+    # Capture this keeper's PID now so exit cleanup targets the process we started.
+    # shellcheck disable=SC2064
     trap "kill ${SUDO_KEEPER_PID} 2>/dev/null || true" EXIT
 }
 

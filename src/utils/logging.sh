@@ -2,8 +2,8 @@
 # Logging utilities for network repair tool
 
 # Source color utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/colors.sh"
+LOGGING_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${LOGGING_SCRIPT_DIR}/colors.sh"
 
 # Log levels
 declare -gA LOG_LEVELS=(
