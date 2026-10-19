@@ -70,6 +70,26 @@ test_system() {
     echo "✓ System utilities work"
 }
 
+# Test that sourcing a module leaves the caller's SCRIPT_DIR alone. Each module
+# loads in a fresh shell started from an unrelated directory.
+test_module_loading() {
+    echo "Testing module loading..."
+
+    local module
+    for module in "${PROJECT_DIR}/src/utils/logging.sh" \
+                  "${PROJECT_DIR}"/src/diagnostics/*.sh \
+                  "${PROJECT_DIR}"/src/repairs/*.sh; do
+        bash -euc '
+            cd /
+            SCRIPT_DIR=caller-directory
+            source "$1"
+            [[ "${SCRIPT_DIR}" == caller-directory ]]
+        ' _ "${module}" || { echo "Sourcing ${module} changed SCRIPT_DIR"; exit 1; }
+    done
+
+    echo "✓ Modules leave the caller's SCRIPT_DIR alone"
+}
+
 # Run all tests
 main() {
     echo "Running utility function tests..."
@@ -78,6 +98,7 @@ main() {
     test_colors
     test_logging
     test_system
+    test_module_loading
 
     echo ""
     echo "All utility tests passed!"
