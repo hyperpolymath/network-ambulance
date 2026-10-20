@@ -172,6 +172,28 @@ test_utilities() {
     echo ""
 }
 
+# Test nested imports without allowing modules to overwrite the caller's paths.
+test_module_loading() {
+    echo -e "${BLUE}Testing Module Loading${NC}"
+    echo ""
+
+    local module
+    for module in "${PROJECT_DIR}"/src/{utils,diagnostics,repairs}/*.sh; do
+        if bash -euo pipefail -c '
+            cd /
+            readonly SCRIPT_DIR=/caller
+            source "$1"
+            [[ "${SCRIPT_DIR}" == /caller ]]
+        ' _ "${module}"; then
+            print_result "PASS" "${module#"${PROJECT_DIR}/"} loads independently"
+        else
+            print_result "FAIL" "${module#"${PROJECT_DIR}/"} loads independently"
+        fi
+    done
+
+    echo ""
+}
+
 # Test main script
 test_main() {
     echo -e "${BLUE}Testing Main Script${NC}"
@@ -252,9 +274,10 @@ test_safe_mode() {
         print_result "FAIL" "Repairs should be blocked in safe mode"
     fi
 
-    # Test that diagnose works without flags
-    if "${PROJECT_DIR}/network-repair" diagnose >/dev/null 2>&1 || \
-       "${PROJECT_DIR}/network-repair" diagnose 2>&1 | grep -q "Diagnostic"; then
+    # This checks that safe mode allows diagnostics to start. Diagnostics may
+    # return a nonzero issue count; capture once to avoid pipefail/SIGPIPE.
+    output=$("${PROJECT_DIR}/network-repair" diagnose 2>&1) || true
+    if grep -q "Complete Network Diagnostics" <<< "${output}"; then
         print_result "PASS" "Diagnose works in safe mode"
     else
         print_result "FAIL" "Diagnose should work in safe mode"
@@ -281,6 +304,7 @@ main() {
     test_utilities
     test_diagnostics
     test_repairs
+    test_module_loading
     test_main
     test_installation
     test_permissions

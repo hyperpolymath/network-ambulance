@@ -2,11 +2,11 @@
 # DNS repair procedures
 
 # Source utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/logging.sh"
-source "${SCRIPT_DIR}/../utils/system.sh"
-source "${SCRIPT_DIR}/../utils/privileges.sh"
-source "${SCRIPT_DIR}/../utils/backup.sh"
+REPAIRS_DNS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${REPAIRS_DNS_DIR}/../utils/logging.sh"
+source "${REPAIRS_DNS_DIR}/../utils/system.sh"
+source "${REPAIRS_DNS_DIR}/../utils/privileges.sh"
+source "${REPAIRS_DNS_DIR}/../utils/backup.sh"
 
 # Repair DNS configuration
 repair_dns_config() {

@@ -2,10 +2,10 @@
 # Routing repair procedures
 
 # Source utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/logging.sh"
-source "${SCRIPT_DIR}/../utils/system.sh"
-source "${SCRIPT_DIR}/../utils/privileges.sh"
+REPAIRS_ROUTING_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${REPAIRS_ROUTING_DIR}/../utils/logging.sh"
+source "${REPAIRS_ROUTING_DIR}/../utils/system.sh"
+source "${REPAIRS_ROUTING_DIR}/../utils/privileges.sh"
 
 # Add default route
 add_default_route() {
@@ -134,7 +134,7 @@ repair_default_route() {
     log_step "Attempting to obtain gateway via DHCP"
 
     # Renew DHCP which should set up routes
-    source "${SCRIPT_DIR}/interfaces.sh"
+    source "${REPAIRS_ROUTING_DIR}/interfaces.sh"
     if renew_dhcp "${primary}"; then
         sleep 2
 
@@ -171,7 +171,7 @@ flush_routing_table() {
     log_step "Rebuilding routes via DHCP"
 
     # Renew DHCP to rebuild routes
-    source "${SCRIPT_DIR}/interfaces.sh"
+    source "${REPAIRS_ROUTING_DIR}/interfaces.sh"
     if renew_dhcp "${primary}"; then
         sleep 3
 
