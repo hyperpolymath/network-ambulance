@@ -2,9 +2,9 @@
 # NetworkManager diagnostics module
 
 # Source utilities
-DIAGNOSTICS_NETWORKMANAGER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${DIAGNOSTICS_NETWORKMANAGER_DIR}/../utils/logging.sh"
-source "${DIAGNOSTICS_NETWORKMANAGER_DIR}/../utils/system.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../utils/logging.sh"
+source "${SCRIPT_DIR}/../utils/system.sh"
 
 # Check NetworkManager status
 check_nm_status() {

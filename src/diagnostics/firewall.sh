@@ -2,10 +2,10 @@
 # Firewall diagnostics module
 
 # Source utilities
-DIAGNOSTICS_FIREWALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${DIAGNOSTICS_FIREWALL_DIR}/../utils/logging.sh"
-source "${DIAGNOSTICS_FIREWALL_DIR}/../utils/system.sh"
-source "${DIAGNOSTICS_FIREWALL_DIR}/../utils/privileges.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../utils/logging.sh"
+source "${SCRIPT_DIR}/../utils/system.sh"
+source "${SCRIPT_DIR}/../utils/privileges.sh"
 
 # Check iptables rules
 check_iptables() {

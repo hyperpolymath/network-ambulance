@@ -2,9 +2,9 @@
 # Network interface diagnostics module
 
 # Source utilities
-DIAGNOSTICS_INTERFACES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${DIAGNOSTICS_INTERFACES_DIR}/../utils/logging.sh"
-source "${DIAGNOSTICS_INTERFACES_DIR}/../utils/system.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../utils/logging.sh"
+source "${SCRIPT_DIR}/../utils/system.sh"
 
 # Check network interfaces
 check_interfaces() {

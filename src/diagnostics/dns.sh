@@ -2,9 +2,9 @@
 # DNS diagnostics module
 
 # Source utilities
-DIAGNOSTICS_DNS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${DIAGNOSTICS_DNS_DIR}/../utils/logging.sh"
-source "${DIAGNOSTICS_DNS_DIR}/../utils/system.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../utils/logging.sh"
+source "${SCRIPT_DIR}/../utils/system.sh"
 
 # Check DNS configuration
 check_dns_config() {

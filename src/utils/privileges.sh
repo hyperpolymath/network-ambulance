@@ -43,7 +43,7 @@ require_root() {
     SUDO_KEEPER_PID=$!
 
     # Kill sudo keeper on exit
-    trap 'kill "${SUDO_KEEPER_PID}" 2>/dev/null || true' EXIT
+    trap "kill ${SUDO_KEEPER_PID} 2>/dev/null || true" EXIT
 }
 
 # Run command with appropriate privileges

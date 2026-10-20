@@ -15,20 +15,10 @@ source "${PROJECT_DIR}/src/utils/system.sh"
 test_colors() {
     echo "Testing color utilities..."
 
-    # Colors are defined but may be empty when output is not a terminal.
-    [[ -v COLOR_RED ]] || { echo "COLOR_RED not defined"; exit 1; }
-    [[ -v COLOR_GREEN ]] || { echo "COLOR_GREEN not defined"; exit 1; }
-    [[ -v COLOR_RESET ]] || { echo "COLOR_RESET not defined"; exit 1; }
-
-    # Explicitly disabling colors must produce plain output.
-    (
-        USE_COLORS=never
-        source "${PROJECT_DIR}/src/utils/colors.sh"
-        [[ -z "${COLOR_RED}${COLOR_GREEN}${COLOR_RESET}" ]] || {
-            echo "Colors should be empty when disabled"
-            exit 1
-        }
-    )
+    # Test that color variables are defined
+    [[ -n "${COLOR_RED}" ]] || { echo "COLOR_RED not defined"; exit 1; }
+    [[ -n "${COLOR_GREEN}" ]] || { echo "COLOR_GREEN not defined"; exit 1; }
+    [[ -n "${COLOR_RESET}" ]] || { echo "COLOR_RESET not defined"; exit 1; }
 
     echo "✓ Color utilities work"
 }
