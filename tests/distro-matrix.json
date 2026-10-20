@@ -24,13 +24,6 @@
         "init": "systemd"
       },
       {
-        "name": "debian-11",
-        "image": "debian:11",
-        "package_manager": "apt",
-        "network_manager": "ifupdown",
-        "init": "systemd"
-      },
-      {
         "name": "debian-12",
         "image": "debian:12",
         "package_manager": "apt",

@@ -2,10 +2,13 @@
 # Routing repair procedures
 
 # Source utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/logging.sh"
-source "${SCRIPT_DIR}/../utils/system.sh"
-source "${SCRIPT_DIR}/../utils/privileges.sh"
+NR_UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../utils" && pwd)"
+# Resolved now: the functions below source interfaces.sh after other
+# modules have loaded.
+NR_REPAIRS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${NR_UTILS_DIR}/logging.sh"
+source "${NR_UTILS_DIR}/system.sh"
+source "${NR_UTILS_DIR}/privileges.sh"
 
 # Add default route
 add_default_route() {
@@ -89,7 +92,16 @@ remove_duplicate_routes() {
     return 0
 }
 
-# Repair default route
+# Remove duplicate default routes if the initial route query succeeds;
+# otherwise try renewing DHCP on the primary interface.
+# Returns 0 when the initial `ip route show default` succeeds, even if its
+# output is empty or the gateway is unreachable. The DHCP fallback returns 0
+# only if renewal and a subsequent route query succeed; otherwise it returns 1,
+# including when no primary interface is found.
+# May remove routes and release/renew a DHCP lease. Requests root/sudo access
+# and exits the shell if access cannot be obtained. With errexit active,
+# unguarded failures such as interface lookup or sourcing helpers can terminate
+# the caller before a return status is produced.
 repair_default_route() {
     log_section "Repair Default Route"
 
@@ -134,7 +146,7 @@ repair_default_route() {
     log_step "Attempting to obtain gateway via DHCP"
 
     # Renew DHCP which should set up routes
-    source "${SCRIPT_DIR}/interfaces.sh"
+    source "${NR_REPAIRS_DIR}/interfaces.sh"
     if renew_dhcp "${primary}"; then
         sleep 2
 
@@ -148,7 +160,15 @@ repair_default_route() {
     return 1
 }
 
-# Flush and rebuild routing table
+# Flush the main routing table and try to rebuild routes by renewing DHCP on
+# the primary interface selected before the flush. May disconnect the network
+# and release/renew a DHCP lease; no rollback is performed on failure.
+# Returns 0 if DHCP renewal and the subsequent `ip route show default` succeed,
+# even if the query output is empty. Returns 1 if no primary interface is found,
+# renewal fails or the final query fails.
+# Requests root/sudo access and exits the shell if access cannot be obtained.
+# With errexit active, unguarded failures such as interface lookup, flushing
+# routes or sourcing helpers can terminate the caller before returning.
 flush_routing_table() {
     log_section "Flush and Rebuild Routing Table"
 
@@ -171,7 +191,7 @@ flush_routing_table() {
     log_step "Rebuilding routes via DHCP"
 
     # Renew DHCP to rebuild routes
-    source "${SCRIPT_DIR}/interfaces.sh"
+    source "${NR_REPAIRS_DIR}/interfaces.sh"
     if renew_dhcp "${primary}"; then
         sleep 3
 

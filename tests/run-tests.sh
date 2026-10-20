@@ -252,9 +252,11 @@ test_safe_mode() {
         print_result "FAIL" "Repairs should be blocked in safe mode"
     fi
 
-    # Test that diagnose works without flags
-    if "${PROJECT_DIR}/network-repair" diagnose >/dev/null 2>&1 || \
-       "${PROJECT_DIR}/network-repair" diagnose 2>&1 | grep -q "Diagnostic"; then
+    # Diagnose returns 1 for network issues, but must complete in safe mode.
+    # Capture once so pipefail and grep closing early cannot mask the result.
+    local diagnose_status=0
+    output=$("${PROJECT_DIR}/network-repair" diagnose 2>&1) || diagnose_status=$?
+    if [[ ${diagnose_status} -le 1 && "${output}" == *"=== Diagnostic Summary ==="* ]]; then
         print_result "PASS" "Diagnose works in safe mode"
     else
         print_result "FAIL" "Diagnose should work in safe mode"

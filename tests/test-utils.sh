@@ -15,10 +15,20 @@ source "${PROJECT_DIR}/src/utils/system.sh"
 test_colors() {
     echo "Testing color utilities..."
 
-    # Test that color variables are defined
-    [[ -n "${COLOR_RED}" ]] || { echo "COLOR_RED not defined"; exit 1; }
-    [[ -n "${COLOR_GREEN}" ]] || { echo "COLOR_GREEN not defined"; exit 1; }
-    [[ -n "${COLOR_RESET}" ]] || { echo "COLOR_RESET not defined"; exit 1; }
+    # Colors are defined but may be empty when stdout is not a terminal.
+    [[ "${COLOR_RED+x}" == x ]] || { echo "COLOR_RED not defined"; exit 1; }
+    [[ "${COLOR_GREEN+x}" == x ]] || { echo "COLOR_GREEN not defined"; exit 1; }
+    [[ "${COLOR_RESET+x}" == x ]] || { echo "COLOR_RESET not defined"; exit 1; }
+
+    # Explicitly disabled colors must stay empty regardless of terminal support.
+    (
+        USE_COLORS=never
+        source "${PROJECT_DIR}/src/utils/colors.sh"
+        [[ -z "${COLOR_RED}${COLOR_GREEN}${COLOR_RESET}" ]] || {
+            echo "Colors should be empty when disabled"
+            exit 1
+        }
+    )
 
     echo "✓ Color utilities work"
 }
@@ -60,6 +70,26 @@ test_system() {
     echo "✓ System utilities work"
 }
 
+# Test that sourcing a module leaves the caller's SCRIPT_DIR alone. Each module
+# loads in a fresh shell started from an unrelated directory.
+test_module_loading() {
+    echo "Testing module loading..."
+
+    local module
+    for module in "${PROJECT_DIR}/src/utils/logging.sh" \
+                  "${PROJECT_DIR}"/src/diagnostics/*.sh \
+                  "${PROJECT_DIR}"/src/repairs/*.sh; do
+        bash -euc '
+            cd /
+            SCRIPT_DIR=caller-directory
+            source "$1"
+            [[ "${SCRIPT_DIR}" == caller-directory ]]
+        ' _ "${module}" || { echo "Sourcing ${module} changed SCRIPT_DIR"; exit 1; }
+    done
+
+    echo "✓ Modules leave the caller's SCRIPT_DIR alone"
+}
+
 # Run all tests
 main() {
     echo "Running utility function tests..."
@@ -68,6 +98,7 @@ main() {
     test_colors
     test_logging
     test_system
+    test_module_loading
 
     echo ""
     echo "All utility tests passed!"
