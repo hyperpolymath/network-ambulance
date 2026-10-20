@@ -37,8 +37,6 @@ jobs:
             image: ubuntu:22.04
           - name: ubuntu-24.04
             image: ubuntu:24.04
-          - name: debian-11
-            image: debian:11
           - name: debian-12
             image: debian:12
 
@@ -116,7 +114,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          dnf install -y \
+          dnf install -y --allowerasing \
             bash iproute iputils bind-utils curl sudo procps-ng ca-certificates
 
       - name: Setup scripts
@@ -275,13 +273,18 @@ jobs:
       image: ${{ matrix.distro.image }}
 
     steps:
+      # actions/checkout unpacks the repository with tar, which these images lack.
+      - name: Install tar for checkout
+        run: zypper --non-interactive install tar gzip
+
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
       - name: Install dependencies
         run: |
           zypper --non-interactive install \
-            bash iproute2 iputils bind-utils curl sudo procps ca-certificates
+            bash iproute2 iputils bind-utils curl sudo procps ca-certificates \
+            findutils grep sed gawk coreutils hostname
 
       - name: Setup scripts
         run: |

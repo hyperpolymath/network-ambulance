@@ -2,9 +2,9 @@
 # Network interface diagnostics module
 
 # Source utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/logging.sh"
-source "${SCRIPT_DIR}/../utils/system.sh"
+NR_UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../utils" && pwd)"
+source "${NR_UTILS_DIR}/logging.sh"
+source "${NR_UTILS_DIR}/system.sh"
 
 # Check network interfaces
 check_interfaces() {
@@ -187,7 +187,7 @@ check_interface_conflicts() {
         ip=$(get_interface_ip "${iface}")
 
         if [[ -n "${ip}" ]]; then
-            if [[ -n "${ip_map[${ip}]}" ]]; then
+            if [[ -n "${ip_map[${ip}]:-}" ]]; then
                 log_error "  Duplicate IP ${ip} on ${iface} and ${ip_map[${ip}]}"
                 issues=$((issues + 1))
             else
