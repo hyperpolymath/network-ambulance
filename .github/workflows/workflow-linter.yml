@@ -62,21 +62,42 @@ jobs:
           fi
           echo "All workflows have permissions declared"
 
+      # Bun is the estate's first-choice runtime (LANGUAGE-POLICY.adoc §1:
+      # Bun > Deno > pnpm > npm). It is the estate pin 1.4.2, downloaded and
+      # sha256-checked as rsr-template-repo#249 installs it, so this gate runs
+      # no third-party action and no unpinned runtime.
+      - name: Install verified Bun 1.4.2
+        run: |
+          curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
+            https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-linux-x64.zip \
+            --output "$RUNNER_TEMP/bun.zip"
+          echo "36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913  $RUNNER_TEMP/bun.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/bun-linux-x64" >> "$GITHUB_PATH"
+
       - name: Check SHA-Pinned Actions
         run: |
           echo "=== Checking Action Pinning ==="
           # Find any uses: lines that don't have @SHA format
           # Pattern: uses: owner/repo@<40-char-hex>
-          unpinned=$(grep -rnE "^[[:space:]]+uses:" .github/workflows/ | \
-            grep -v "@[a-f0-9]\{40\}" | \
-            grep -v "uses: \./\|uses: docker://\|uses: actions/github-script" || true)
+          # Delegated to scripts/check-action-pinning.js. The rule it enforces is
+          # unchanged in spirit — every action ref must resolve to an immutable
+          # commit — but "pinned" now includes refs the workflow lockfile
+          # resolves, which is how this repo pins them. Kept as a script rather
+          # than inline because the inline form needs a heredoc inside a YAML
+          # block scalar, and that is a well-known way to ship a gate that
+          # silently does nothing.
+          if ! bun scripts/check-action-pinning.js; then
+            unpinned="see above"
+          else
+            unpinned=""
+          fi
 
           if [ -n "$unpinned" ]; then
             echo "ERROR: Found unpinned actions:"
-            echo "$unpinned"
             echo ""
             echo "Replace version tags with SHA pins, e.g.:"
-            echo "  uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.1.1"
+            echo "  uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
             exit 1
           fi
           echo "All actions are SHA-pinned"
