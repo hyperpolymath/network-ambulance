@@ -2,9 +2,9 @@
 # Connectivity diagnostics module
 
 # Source utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/logging.sh"
-source "${SCRIPT_DIR}/../utils/system.sh"
+NR_UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../utils" && pwd)"
+source "${NR_UTILS_DIR}/logging.sh"
+source "${NR_UTILS_DIR}/system.sh"
 
 # Test basic connectivity
 test_basic_connectivity() {
@@ -167,7 +167,7 @@ test_mtu() {
         # Subtract 28 bytes for IP + ICMP header
         local packet_size=$((size - 28))
 
-        if ping -c 1 -W 2 -M do -s ${packet_size} 8.8.8.8 >/dev/null 2>&1; then
+        if ping -c 1 -W 2 -M 'do' -s ${packet_size} 8.8.8.8 >/dev/null 2>&1; then
             log_success "  Packet size ${size} bytes: OK"
             break
         else
