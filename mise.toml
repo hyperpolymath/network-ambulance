@@ -32,7 +32,7 @@ gnu-grep = "latest"
 # Task runner alias
 [alias]
 task = "go-task"
-build = "cargo build --release"
-test = "cargo test"
+build = "cargo build --release --manifest-path src-tauri/Cargo.toml"
+test = "cargo test --manifest-path src-tauri/Cargo.toml"
 lint = "bunx --no-install --bun prettier --check ."
 fmt = "bunx --no-install --bun prettier --write ."
