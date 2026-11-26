@@ -25,7 +25,6 @@ gnu-tar = "latest"
 gnu-grep = "latest"
 
 # Testing
-vitest = "latest"
 
 [env]
 # Common environment variables
