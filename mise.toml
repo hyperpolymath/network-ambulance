@@ -11,7 +11,6 @@ cargo = "latest"
 go-task = "latest"
 
 # Formatting & Linting
-prettier = "latest"
 shfmt = "latest"
 stylua = "latest"
 
@@ -36,5 +35,5 @@ vitest = "latest"
 task = "go-task"
 build = "cargo build --release"
 test = "cargo test"
-lint = "prettier --check ."
-fmt = "prettier --write ."
+lint = "bunx --bun prettier@3.10.1 --check ."
+fmt = "bunx --bun prettier@3.10.1 --write ."
